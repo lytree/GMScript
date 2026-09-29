@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Get Microsoft Rewards (修复/增强版)
 // @namespace    https://github.com/lytree/GMScript
-// @version      1.0.7
+// @version      1.0.8
 // @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。基于原脚本二次开发，在 Gemini AI 辅助下优化多区域兼容与卡片过滤逻辑。
 // @author       lytree (二次开发); 原作者 Muverix / 基于 QingJ《Get Microsoft Rewards》
 // @license      MIT
@@ -34,8 +34,8 @@
 // @connect      hotapi.nntool.cc
 // @connect      cnxiaobai.com
 // @run-at       document-end
-// @downloadURL https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.user.js
-// @updateURL   https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.meta.js
+// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.user.js
+// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.user.js
 // ==/UserScript==
 
 /* =========================================================================

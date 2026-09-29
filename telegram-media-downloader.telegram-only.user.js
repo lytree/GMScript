@@ -82,10 +82,12 @@
 // @description:zh-CN  支持从限制下载的 Telegram 频道中获取图片、视频及语音消息，界面设计与 Telegram 原生风格高度统一(Privacy Policy: https://github.com/nuck-liu2335/Script-Policy)
 // @description:zh-TW  支援從限制下載的 Telegram 頻道中下載圖片、影片與語音訊息，介面設計與 Telegram 原生風格高度一致(Privacy Policy: https://github.com/nuck-liu2335/Script-Policy)
 // @namespace   Andrew-Telegram-Media-Downloader-Ultimate
-// @version     1.0.6
+// @version     1.0.7
 // @modified    2026-09-30  仅限 telegram.org 站点运行：严格 @match + 运行时域名守卫；已剥离第三方推广注入模块
 // @author      Andrew, Nestor Qin
 // @license     GNU GPLv3
+// @homepage    https://github.com/lytree/GMScript
+// @supportURL  https://github.com/lytree/GMScript/issues
 // @match       https://web.telegram.org/*
 // @match       https://webk.telegram.org/*
 // @match       https://webz.telegram.org/*
@@ -93,6 +95,8 @@
 // @icon        https://img.icons8.com/color/452/telegram-app--v5.png
 // @noframes
 // @grant       unsafeWindow
+// @downloadURL https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js
+// @updateURL   https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js
 // ==/UserScript==
 (function () {
   'use strict';
