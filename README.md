@@ -9,15 +9,15 @@
 > 前置条件：浏览器先装好 [Tampermonkey](https://www.tampermonkey.net/) 或 Violentmonkey。
 > 打开下面任一地址会弹出脚本管理器的安装页；若页面直接显示源码，说明没装脚本管理器。
 
-### 1. Get Microsoft Rewards（修复/增强版） · v1.0.8
+### 1. Get Microsoft Rewards (修复/增强版) · v1.0.8
 
 ```
-https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.user.js
+https://raw.githubusercontent.com/lytree/GMScript/main/get-microsoft-rewards.user.js
 ```
 
-👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/Get%20Microsoft%20Rewards%20%28%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88%29.user.js)
+👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/get-microsoft-rewards.user.js)
 
-### 2. Telegram Media Downloader（Optimized & Enhanced） · v1.0.7
+### 2. Telegram Media Downloader (Optimized & Enhanced) · v1.0.7
 
 ```
 https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js
@@ -31,17 +31,17 @@ https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader
 
 ## 脚本列表
 
-| 脚本 | 版本 | 说明 |
+| 文件名 | 版本 | 说明 |
 | --- | --- | --- |
-| Get Microsoft Rewards (修复/增强版) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化 |
-| Telegram Media Downloader (Optimized & Enhanced) | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块 |
+| `get-microsoft-rewards.user.js` | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
+| `telegram-media-downloader.telegram-only.user.js` | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块 |
 
 ---
 
 ## 常见问题
 
 **地址打不开 / 返回 404？**
-确认文件名与大小写完全一致。含中文和括号的文件名必须做百分号编码，直接复制上面的地址即可，不要手打。
+确认文件名与大小写完全一致 —— raw 地址是**区分大小写**的。直接复制上面的地址，不要手打。
 
 **装完不自动更新？**
 在脚本管理器里打开该脚本 → 设置 → 检查更新。若仍无反应，说明当前安装版本的 `@updateURL` 指向失效地址，重新访问上方安装地址覆盖安装一次即可恢复正常。
@@ -53,10 +53,11 @@ https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader
 
 ## 命名与更新约定
 
-1. **文件名不带版本号**，版本号只由 header 里的 `@version` 承载 —— 这样 raw 地址恒定，用户无需重装。
-2. **`@downloadURL` 与 `@updateURL` 指向同一个 `.user.js`**（不使用独立的 `.meta.js`），维护成本最低。
-3. **`@name` + `@namespace` 一旦发布不再改动**，理由见上方常见问题。
-4. 含中文 / 括号的文件名在 URL 中必须做百分号编码，例如 `(` → `%28`、`修复增强版` → `%E4%BF%AE%E5%A4%8D%E5%A2%9E%E5%BC%BA%E7%89%88`。
+1. **文件名全用 ASCII 英文，kebab-case** —— 不含中文、空格、括号。这样 URL 无需百分号编码，地址短且不会因编码写错而 404。
+2. **文件名不带版本号**，版本号只由 header 里的 `@version` 承载 —— 这样 raw 地址恒定，用户无需重装。
+3. **`@downloadURL` 与 `@updateURL` 指向同一个 `.user.js`**（不使用独立的 `.meta.js`），维护成本最低。
+4. **`@name` + `@namespace` 一旦发布不再改动**，理由见上方常见问题。
+5. **脚本显示名可以保留中文**（如 `@name:zh-CN`），它与文件名各自独立，互不影响。
 
 ## 发布流程
 
@@ -65,7 +66,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader
 3. **推送后校验 raw 地址返回 200**，确认更新链路通顺：
 
    ```bash
-   curl -sI https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js | head -1
+   curl -sI https://raw.githubusercontent.com/lytree/GMScript/main/get-microsoft-rewards.user.js | head -1
    ```
 
 > 注意：重命名文件时，GitHub 上必须同步改名，否则 raw 地址会 404、自动更新失效。
