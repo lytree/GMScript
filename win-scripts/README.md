@@ -12,10 +12,13 @@
 | --- | --- | --- |
 | [`run-as-admin.cmd`](run-as-admin.cmd) | **一键提权入口**，双击即用 | 自动 |
 | [`set-system-env-pwsh7.ps1`](set-system-env-pwsh7.ps1) | 把 9 个环境变量写成**系统级**（Machine scope） | 需 |
-| [`windows-dev-setup.ps1`](windows-dev-setup.ps1) | 装 PowerShell 7 / Git / Git LFS（支持代理） | 自动 |
+| [`windows-dev-setup.ps1`](windows-dev-setup.ps1) | 装 PowerShell 7 / Git / Git LFS（支持代理，**pwsh 7 only**） | 自动 |
 | [`install-ffmpeg.ps1`](install-ffmpeg.ps1) + [`install-ffmpeg.bat`](install-ffmpeg.bat) | 装 FFmpeg 到 `E:\ffmpeg` | 否 |
 | [`irfanview-assoc.bat`](irfanview-assoc.bat) | IrfanView 图片关联（45 种格式），可撤销 | 否 |
 | [`ffmpeg-install.bat`](ffmpeg-install.bat) | FFmpeg 的早期纯 bat 版本，保留备用 | 否 |
+
+此外还有 2 个**本机专用、不入库**的脚本（见下方[Kali on WSL2](#kali-on-wsl2本机专用--不入库)）：
+`install-kali-wsl.ps1`、`finish-kali-wsl.ps1`。
 
 ---
 
@@ -101,16 +104,17 @@ registry=https://registry.npmmirror.com
 
 ```powershell
 # 基础用法（无代理）
-powershell -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1
 
 # 带代理（优先 D 盘安装）
-powershell -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -Proxy http://127.0.0.1:7890
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -Proxy http://127.0.0.1:7890
 
 # 只打印命令，不实际执行
-powershell -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -DryRun
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -DryRun
 ```
 
-支持 5.1 与 7 双版本，会自动弹 UAC。
+`#Requires -Version 7.0` —— **必须 pwsh 7**，不支持 5.1；会自动弹 UAC。
+退出码：`0` 成功 / `1` 有失败项 / `3` 版本不足（5.1）。
 
 ### FFmpeg
 
@@ -134,11 +138,22 @@ install-ffmpeg.bat /nopause                         :: 无人值守
 ```powershell
 # 管道执行时无法传参，用环境变量传
 $env:DEV_SETUP_PROXY = 'http://127.0.0.1:7890'
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/lytree/xxx/main/install.ps1 | iex"
+pwsh -NoProfile -c "irm https://raw.githubusercontent.com/lytree/xxx/main/install.ps1 | iex"
 ```
+
+**必须用 `pwsh`，不能写 `powershell`。** 仓库内所有 `.ps1` 都已收敛到 PowerShell 7，
+`powershell.exe`（5.1）跑任何一个都会失败。
 
 若脚本托管在别处，额外设 `DEV_SETUP_URL` 指向它自己的 raw 地址 —— 管道执行时 `$PSCommandPath` 为空，
 脚本需要靠这个地址把自己落盘再提权重启。
+
+### 为什么文档命令和运行时闸要写两遍
+
+`#Requires -Version 7.0` **只在加载脚本文件时生效**。`irm | iex` 送进来的是一段脚本块，
+引擎不解析 `#Requires` —— 5.1 会被静默放行，然后在后面某个莫名其妙的地方炸掉。
+
+所以脚本里另有一道运行时检查（`$PSVersionTable.PSVersion.Major -lt 7` → 打印安装指引 → `exit 3`），
+让 `-File` 和 `irm | iex` 两条入口的版本行为完全一致。
 
 ---
 
@@ -165,6 +180,32 @@ irfanview-assoc.bat /nopause          :: 无人值守
 
 ---
 
+## Kali on WSL2（本机专用 · 不入库）
+
+这两个脚本**只存在于本地**，已被 `.gitignore` 排除（`win-scripts/*kali*.ps1`）——
+镜像路径 `G:\Hyper\kali-linux\`、用户名等都是个人环境信息，没有对外分享价值。
+下表仅为**本地索引**，仓库里下载不到，需要时直接跑本地文件。
+
+| 脚本 | 作用 | 权限 |
+| --- | --- | --- |
+| `install-kali-wsl.ps1` | 把 `ext4.vhdx` 镜像原地导入 WSL2（`--import-in-place`，零拷贝） | 管理员 |
+| `finish-kali-wsl.ps1` | 首次初始化：启动验证 / 密码 / 普通用户 / 免密 sudo | 普通 |
+
+```powershell
+# 1. 导入镜像（原地注册，不复制 25GB）
+.\win-scripts\run-as-admin.cmd
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\install-kali-wsl.ps1
+
+# 2. 首次初始化（幂等，可重复跑）
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\finish-kali-wsl.ps1 -User kali
+```
+
+细节（`--import-in-place` 的回退策略、`-Force` 的删数据风险、导入前后的校验项等）
+见两个脚本自身的注释头。通用踩坑（`wsl -e` 不经 shell 解析、`passwd` 无输入会卡死等）
+见下方[踩过的坑](#踩过的坑)。
+
+---
+
 ## 本机现状（2026-10）
 
 **已就绪**
@@ -187,6 +228,13 @@ irfanview-assoc.bat /nopause          :: 无人值守
 ## 踩过的坑
 
 - **`.ps1` 必须是 UTF-8 with BOM。** Windows PowerShell 5.1 读无 BOM 的 UTF-8 会按 GBK 解码，中文注释和字符串全变乱码，脚本当场语法错误（报 `意外的标记`）。改这些文件务必保留 BOM。
+- **`#Requires` 对 `irm | iex` 无效。** 它只在引擎加载脚本**文件**时检查；管道送进来的是脚本块，`#Requires` 根本不被解析，5.1 会被静默放行。要拦版本就得自己写运行时检查。
+- **`irm | iex` 的落盘重启用 `utf8BOM` 而非 `UTF8`。** pwsh 7 里 `-Encoding UTF8` 等于 `utf8NoBOM`，落盘的文件再被别的进程读时没有保险。
+- **`(Get-Process -Id $PID).Path` 不能用来找宿主 shell。** 在 ISE / VS Code 集成终端里它可能返回 `powershell.exe` 或干脆为空；提权重启应显式解析 `pwsh`。
+- **`wsl -e` 不经过 shell 解析。** 必须显式 `-e /bin/bash -lc`，否则 `;` `|` `>` 会被当作可执行文件名的一部分，`execvpe` 直接报 `No such file or directory`。
+- **函数返回退出码会混进输出。** `Invoke-Wsl` 里 `& $Wsl ...` 的 stdout 也进输出流，`return $LASTEXITCODE` 再追加一个 —— `$code` 变成数组，而 `数组 -ne 0` 返回的是「非零元素」永远为真。**退出码必须走脚本级变量。**
+- **`passwd` 在无输入时无限等待。** 脚本里包 `passwd` 必须做成显式开关（如 `-SetPassword`），否则非交互调用会卡死。
+- **WSL 输出后光标常停在行尾**（不补末尾换行），紧随其后的 `Write-Host` 会接在同一行。用「刚跑过 WSL」标志位决定是否补换行，比到处手写 `Write-Host ''` 可靠。
 - **`.bat` / `.cmd` 必须是纯 ASCII + CRLF。** cmd.exe 按 GBK 解析，中文符号（`√` `！`）会变乱码；LF 换行也可能解析异常。所以这些文件里的提示文字都是英文，且已转成 CRLF。
 - **原生命令输出经 `2>&1` 是数组，不是字符串。** `ffmpeg -version` 把版本写到 stderr，`$out -match ...` 对数组只返回布尔、**不填 `$Matches`** —— 必须先 `[string]$line` 显式取单行，否则版本检测永远失败。
 - **bat 里用 `!VAR!` 就要开 `setlocal enabledelayedexpansion`**，否则 `!` 不展开。

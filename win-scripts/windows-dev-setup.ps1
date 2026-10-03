@@ -1,7 +1,7 @@
-﻿#Requires -Version 5.1
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
-    Windows 开发环境一键安装 / 配置脚本（Windows PowerShell 5.1 与 PowerShell 7 通用）。
+    Windows 开发环境一键安装 / 配置脚本（需要 PowerShell 7 / pwsh）。
 
 .DESCRIPTION
     通过 winget 安装最新版的 PowerShell 7(pwsh)、Git、Git LFS（默认优先装到 D 盘），
@@ -10,6 +10,10 @@
 
     脚本会自动提权（需要管理员，因为要写系统环境变量）；
     从网络管道执行（irm | iex）时会先把自身落盘为临时文件再提权重启。
+
+    ⚠️ 只支持 PowerShell 7（pwsh），不支持 Windows PowerShell 5.1 ——
+    `#Requires -Version 7.0` 在 `-File` 与 `irm | iex` 两种入口下都会拦截 5.1。
+    仓库内其余脚本（set-system-env / install-ffmpeg）与 .bat 包装器同样统一到 pwsh 7。
 
 .PARAMETER Proxy
     代理地址，例如 http://127.0.0.1:7890 。
@@ -24,15 +28,15 @@
     指定 Git / PowerShell 的安装目录（默认在 InstallRoot 下）。
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\windows-dev-setup.ps1
+    pwsh -NoProfile -ExecutionPolicy Bypass -File .\windows-dev-setup.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File .\windows-dev-setup.ps1 -Proxy http://127.0.0.1:7890
+    pwsh -NoProfile -ExecutionPolicy Bypass -File .\windows-dev-setup.ps1 -Proxy http://127.0.0.1:7890
 
 .EXAMPLE
-    # 托管到 raw 地址后，用 uv 那种一行流执行
+    # 托管到 raw 地址后，用 uv 那种一行流执行（必须用 pwsh，powershell.exe 会被 #Requires 拦下）
     $env:DEV_SETUP_PROXY = 'http://127.0.0.1:7890'
-    powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/<you>/<repo>/main/install.ps1 | iex"
+    pwsh -NoProfile -c "irm https://raw.githubusercontent.com/<you>/<repo>/main/install.ps1 | iex"
 #>
 [CmdletBinding()]
 param(
@@ -68,6 +72,24 @@ param(
 
 # 变量合并阶段的 try/catch 自行处理错误；此处不设全局 Stop，避免原生命令 stderr 直接终止脚本
 $ErrorActionPreference = 'Continue'
+
+# --------------------------------------------------------------------------------------
+# 0.5 版本闸
+# --------------------------------------------------------------------------------------
+# 顶部的 `#Requires -Version 7.0` 只在「加载脚本文件」时生效；
+# 而 `irm | iex` 送进来的是一段脚本块，引擎不解析 #Requires —— 5.1 会被静默放行。
+# 所以这里显式补一道运行时检查，让两条入口的版本行为一致。
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    Write-Host ''
+    Write-Host '  [X] 需要 PowerShell 7（pwsh），当前是 ' $PSVersionTable.PSVersion -ForegroundColor Red
+    Write-Host ''
+    Write-Host '  请改用 pwsh 重新执行：' -ForegroundColor Yellow
+    Write-Host '    pwsh -NoProfile -ExecutionPolicy Bypass -File <脚本路径>' -ForegroundColor Gray
+    Write-Host '  若本机还没装 pwsh：' -ForegroundColor Yellow
+    Write-Host '    winget install --id Microsoft.PowerShell -e' -ForegroundColor Gray
+    Write-Host ''
+    exit 3
+}
 
 # --------------------------------------------------------------------------------------
 # 0. 全局配置
@@ -169,15 +191,32 @@ function Resolve-SelfPath {
     if ($url) {
         $tmp = Join-Path $env:TEMP 'windows-dev-setup.ps1'
         Write-Log "从 $url 拉取脚本到 $tmp 以便提权重执行" -Level Debug
-        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+        Invoke-WebRequest -Uri $url -OutFile $tmp
         return $tmp
     }
 
     $body = $MyInvocation.MyCommand.Definition
     if ($body) {
         $tmp = Join-Path $env:TEMP 'windows-dev-setup.ps1'
-        Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
+        # utf8BOM：保持仓库约定，5.1 万一被误调用也不会因 GBK 解码而语法错误
+        Set-Content -LiteralPath $tmp -Value $body -Encoding utf8BOM
         return $tmp
+    }
+    return $null
+}
+
+# 解析 pwsh 可执行文件路径（提权重启用）。
+# 脚本已锁定 PS 7，所以这里只认 pwsh —— 不再用 (Get-Process -Id $PID).Path 猜宿主，
+# 避免在 ISE / VS Code 集成终端等宿主里拿到 powershell.exe 又降级回去。
+function Resolve-PwshPath {
+    $cmd = Get-Command 'pwsh' -CommandType Application -ErrorAction SilentlyContinue |
+           Select-Object -First 1
+    if ($cmd -and $cmd.Source) { return $cmd.Source }
+
+    foreach ($p in @(
+            "$env:ProgramFiles\PowerShell\7\pwsh.exe",
+            "${env:ProgramFiles(x86)}\PowerShell\7\pwsh.exe")) {
+        if ($p -and (Test-Path -LiteralPath $p)) { return $p }
     }
     return $null
 }
@@ -189,8 +228,11 @@ function Invoke-SelfElevated {
         return $false
     }
 
-    $psExe = (Get-Process -Id $PID).Path
-    if (-not $psExe) { $psExe = 'powershell.exe' }
+    $psExe = Resolve-PwshPath
+    if (-not $psExe) {
+        Write-Log '找不到 pwsh.exe，无法自动提权。请先安装 PowerShell 7 后重试。' -Level Err
+        return $false
+    }
 
     $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"{0}"' -f $self))
     if ($Proxy)                    { $argList += @('-Proxy', ('"{0}"' -f $Proxy)) }
