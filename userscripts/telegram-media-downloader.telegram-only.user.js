@@ -95,8 +95,8 @@
 // @icon        https://img.icons8.com/color/452/telegram-app--v5.png
 // @noframes
 // @grant       unsafeWindow
-// @downloadURL https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js
-// @updateURL   https://raw.githubusercontent.com/lytree/GMScript/main/telegram-media-downloader.telegram-only.user.js
+// @downloadURL https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js
+// @updateURL   https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js
 // ==/UserScript==
 (function () {
   'use strict';

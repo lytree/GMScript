@@ -34,8 +34,8 @@
 // @connect      hotapi.nntool.cc
 // @connect      cnxiaobai.com
 // @run-at       document-end
-// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/get-microsoft-rewards.user.js
-// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/get-microsoft-rewards.user.js
+// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js
+// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js
 // ==/UserScript==
 
 /* =========================================================================
