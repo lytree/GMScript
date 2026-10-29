@@ -36,6 +36,16 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 <sub>本脚本由三份上游实现（Nestor Qin / yoshiko.wisoky / copyMister）合并而成，并取代旧版 `telegram-media-downloader.telegram-only.user.js`（v1.0.7，已下线）。**旧版用户请先卸载旧脚本再装这个**，两者 identity 不同，同时安装会重复注入下载面板。</sub>
 
+#### 3. WPS Auto Sign-in (自动签到) · v1.0.0
+
+```
+https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-signin.user.js
+```
+
+👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-signin.user.js)
+
+<sub>登录 WPS 后自动运行，零配置：每日签到（会员 + 积分）、福利中心打卡领会员、天天抽奖。调用的是 WPS 官方公开接口，频率已做限制，风险自负。</sub>
+
 <sub>以上地址同时是 `@downloadURL` 与 `@updateURL`。脚本管理器会按此地址定期检查版本，**升级无需重新安装**。</sub>
 
 ### 脚本列表
@@ -44,6 +54,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
 | [`telegram-media-downloader.user.js`](userscripts/telegram-media-downloader.user.js) | 3.0.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**三份上游脚本合并版**：WebA(webz) + WebK(webk) 双端挂载、任务面板（取消 / 重试 / 续传 / 4 MB 分片）、原生 `downloadToDisc` 通道、右键菜单下载、选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 仅放行 web/webk/webz 三个子域 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。<br>显示名：`Telegram Media Downloader Pro` |
+| [`wps-auto-signin.user.js`](userscripts/wps-auto-signin.user.js) | 1.0.0 | WPS 自动签到助手：每日签到（领会员 + 积分）、福利中心打卡领会员、天天抽奖。登录 WPS 后自动运行，零配置；带本地单元 / 端到端测试。<br>显示名：`WPS Auto Sign-in (自动签到)` |
 
 ### 常见问题
 
@@ -86,6 +97,18 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 > 注意：重命名或移动文件时，GitHub 上必须同步操作，且脚本内的 `@updateURL` / `@downloadURL` 要一并更新，
 > 否则 raw 地址会 404、自动更新失效。
+
+### 本地测试
+
+带测试的脚本放在 [`userscripts/tests/`](userscripts/tests/)，纯 Node 运行，不需要浏览器：
+
+```bash
+node userscripts/tests/wps-auto-signin.unit.mjs   # 27 项：base64 / RSA / AES / classify / header 自检
+node userscripts/tests/wps-auto-signin.e2e.mjs    # 23 项：真实抓包响应驱动任务函数，覆盖全部业务分支
+```
+
+测试从 `.user.js` 源码里**抽取真实函数体**执行（不是手抄副本），脚本一改测试立刻反映；
+被测脚本按 `import.meta.url` 相对定位，clone 到任意目录都能跑。
 
 ---
 
