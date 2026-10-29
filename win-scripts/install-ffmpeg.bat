@@ -62,7 +62,9 @@ echo.
 if "%RC%"=="0" (
     echo [OK] Finished. Open a NEW terminal to use ffmpeg.
 ) else (
-    echo [!] Exit code %RC%  ^(0=ok, 1=failed^)
+    rem  NOTE: with enabledelayedexpansion, "[!]" gets eaten as a variable
+    rem  reference and prints "[]". Avoid "!" in echo'd text.
+    echo [WARN] Exit code %RC%  ^(0=ok, 1=failed^)
     echo     Log: %TEMP%\install-ffmpeg.log
 )
 
