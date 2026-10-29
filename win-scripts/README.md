@@ -15,6 +15,7 @@
 | [`windows-dev-setup.ps1`](windows-dev-setup.ps1) | 装 PowerShell 7 / Git / Git LFS（支持代理，**pwsh 7 only**） | 自动 |
 | [`install-ffmpeg.ps1`](install-ffmpeg.ps1) + [`install-ffmpeg.bat`](install-ffmpeg.bat) | 装 FFmpeg 到 `E:\ffmpeg` | 否 |
 | [`irfanview-assoc.bat`](irfanview-assoc.bat) | IrfanView 图片关联（45 种格式），可撤销 | 否 |
+| [`potplayer-assoc.bat`](potplayer-assoc.bat) + [`potplayer-assoc.ps1`](potplayer-assoc.ps1) | PotPlayer 视频关联（43 种格式），自动探测 exe，可撤销 | 否 |
 | [`ffmpeg-install.bat`](ffmpeg-install.bat) | FFmpeg 的早期纯 bat 版本，保留备用 | 否 |
 
 此外还有 2 个**本机专用、不入库**的脚本（见下方[Kali on WSL2](#kali-on-wsl2本机专用--不入库)）：
@@ -33,6 +34,9 @@
 
 # 3. 给图片关联 IrfanView
 .\win-scripts\irfanview-assoc.bat
+
+# 4. 给视频关联 PotPlayer
+.\win-scripts\potplayer-assoc.bat
 ```
 
 ---
@@ -180,6 +184,51 @@ irfanview-assoc.bat /nopause          :: 无人值守
 
 ---
 
+## PotPlayer 视频关联
+
+`potplayer-assoc.ps1`（全部逻辑）+ `potplayer-assoc.bat`（入口），把 43 种视频格式关联到 PotPlayer。
+
+```bat
+potplayer-assoc.bat                                       :: 关联（自动探测 exe）
+potplayer-assoc.bat /remove                               :: 撤销
+potplayer-assoc.bat -ExePath "D:\PotPlayer\PotPlayerMini64.exe"
+potplayer-assoc.bat -Extensions mp4,mkv /nopause          :: 只关联指定格式
+```
+
+**exe 自动探测**按序尝试：`App Paths` 注册表 → 已注册的 `PotPlayer.Media.64` ProgID 反查 →
+13 个常见安装目录（C/D/E 盘的 `DAUM\PotPlayer` 等）→ `PATH`。都找不到则报错退出（码 `1`）并提示用 `-ExePath`。
+
+**注册表布局**（`HKCU`，ProgID 名 `PotPlayer.Video`）：
+
+| 键 | 值 |
+| --- | --- |
+| `...\PotPlayer.Video` | `PotPlayer 视频播放器` |
+| `...\PotPlayer.Video\DefaultIcon` | `"<exe>",0` |
+| `...\PotPlayer.Video\shell\open\command` | `"<exe>" "%1"` |
+| `...\PotPlayer.Video\Capabilities` | `ApplicationName` / `Description` |
+| `...\.mp4`（每个扩展名） | 默认值 = `PotPlayer.Video` |
+| `...\.mp4\OpenWithProgids` | 值 `PotPlayer.Video` = 空串 |
+
+`/remove` **只删** `PotPlayer.Video` 和各扩展名下的 `OpenWithProgids\PotPlayer.Video`，
+**保留扩展名键本身** —— 与 `irfanview-assoc.bat` 同一策略，Windows 自动回落到系统默认关联。
+
+退出码：`0` 成功 / `1` 有失败项或没找到 exe / `3` PowerShell 5.1。
+
+### 关联「看起来没生效」的两个原因
+
+1. **UserChoice 压着**。Win10/11 的「打开方式 > 始终使用」会写
+   `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.ext\UserChoice`，
+   该键带签名校验，脚本不碰。删掉对应 `UserChoice` 键，或去
+   「设置 > 应用 > 默认应用」重设一次。
+2. **资源管理器没刷新**。换一个新开的 Explorer 窗口看，旧窗口的图标是缓存。
+
+### 注意：本机装过 PotPlayer 但已卸载
+
+`HKCU\Software\Classes\.mp4` / `.mkv` 下留有 `DaumLive64Backup.bak`（值指向 `WMP11.AssocFile.MP4`）——
+DAUM 安装器的备份条目。**这是既有键，不要连带删除**，本脚本的 `/remove` 也不会碰它。
+
+---
+
 ## Kali on WSL2（本机专用 · 不入库）
 
 这两个脚本**只存在于本地**，已被 `.gitignore` 排除（`win-scripts/*kali*.ps1`）——
@@ -219,6 +268,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\finish-kali-wsl.ps1 
 | Node.js | v24.13.0 · `E:\nodejs` |
 | npm | 11.20.0（全局包区 `E:\node\modules`） |
 | IrfanView | 4.75 · 45 个图片格式已关联 |
+| PotPlayer 关联脚本 | 已入库（`potplayer-assoc.ps1`）· PotPlayer 本体**未安装**，未执行 |
 | 环境变量 | 9 个系统级变量全部生效 |
 
 **未安装**：Git / Git LFS（`windows-dev-setup.ps1` 可装，尚未执行）
@@ -236,6 +286,11 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\finish-kali-wsl.ps1 
 - **`passwd` 在无输入时无限等待。** 脚本里包 `passwd` 必须做成显式开关（如 `-SetPassword`），否则非交互调用会卡死。
 - **WSL 输出后光标常停在行尾**（不补末尾换行），紧随其后的 `Write-Host` 会接在同一行。用「刚跑过 WSL」标志位决定是否补换行，比到处手写 `Write-Host ''` 可靠。
 - **`.bat` / `.cmd` 必须是纯 ASCII + CRLF。** cmd.exe 按 GBK 解析，中文符号（`√` `！`）会变乱码；LF 换行也可能解析异常。所以这些文件里的提示文字都是英文，且已转成 CRLF。
+- **`enabledelayedexpansion` 下 `echo [!]` 会打成 `[]`。** `!]` 被当成变量引用吃掉了。写提示文字别用 `!`，改用 `[WARN]`。
+- **cmd.exe 把 `,` 当参数分隔符，`-File` 收不了数组。** `-Extensions mp4,mkv` 经 `.bat` 的 shift 循环会变成两个参数，pwsh 报「找不到接受自变量 'mkv' 的位置参数」。所以：`.bat` 里**原样转发 `%*`**（不用 shift 循环），`.ps1` 的对应参数声明成 `[string]` 再 `-split '[,;\s]+'`。
+- **别把参数丢给 `findstr` 判断。** 载荷里含逗号时 findstr 会把 `/a` 当开关（"忽略 /a" + "错误的命令行"）。用 `call set` 纯字符串替换来剥 `/nopause`。
+- **注册表的「默认值」不能靠 `New-ItemProperty -Name '(default)'` 写。** 那只会建出一个**名字叫 `(default)` 的普通值**，真正的默认值仍是空 —— 写完 `reg query /ve` 一看是空的。必须 `Set-Item -Path $k -Value ...`（且 `-Value $null` 会报 `Value cannot be null`，删空值得走 `[Microsoft.Win32.Registry]….DeleteValue('')`）。
+- **读注册表默认值只能用 `GetValue('')`。** `Get-Item` 在注册表 provider 下返回 `Microsoft.Win32.RegistryKey`，默认值在 `GetValue('')` 里；`PSObject` 里那个属性的**名字是空字符串**（控制台显示成 `(default)`），按 `'(default)'` 去索引会拿到 `$null`。而且 `Set-StrictMode -Version Latest` 下直接取 `.'(default)'` 属性会**抛异常**而不是返回 `$null`。
 - **原生命令输出经 `2>&1` 是数组，不是字符串。** `ffmpeg -version` 把版本写到 stderr，`$out -match ...` 对数组只返回布尔、**不填 `$Matches`** —— 必须先 `[string]$line` 显式取单行，否则版本检测永远失败。
 - **bat 里用 `!VAR!` 就要开 `setlocal enabledelayedexpansion`**，否则 `!` 不展开。
 - **`pause` 会卡住非交互调用。** 需要无人值守时提供 `/nopause` 开关。
