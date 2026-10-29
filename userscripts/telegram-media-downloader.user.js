@@ -13,6 +13,8 @@
 // @description:my     Telegram ဝဘ်မှ ပုံ၊ ဗီဒီယို၊ အသံနှင့် ဖိုင်များကို ဒေါင်းလုဒ်လုပ်ပါ (ပြန်ပို့မရသော ကန့်သတ်ချက်ရှိ ချန်နယ်များအပါအဝင်)။ ရွေးချယ်ထားသော မီဒီယာများကို အစုလိုက် သိမ်းဆည်းနိုင်ပြီး ဒေါင်းလုဒ်ကို ပယ်ဖျက်/ထပ်စမ်း/ဆက်လုပ်နိုင်သည်။
 // @author       Nestor Qin, yoshiko.wisoky, copyMister — merged
 // @license      GNU GPLv3
+// @homepage     https://github.com/lytree/GMScript
+// @supportURL   https://github.com/lytree/GMScript/issues
 // @match        https://web.telegram.org/*
 // @match        https://webk.telegram.org/*
 // @match        https://webz.telegram.org/*
@@ -20,6 +22,8 @@
 // @grant        unsafeWindow
 // @noframes
 // @run-at       document-start
+// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js
+// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js
 // ==/UserScript==
 
 /*
@@ -51,10 +55,25 @@
  *     → 所有新 UI 文案纳入同一套 i18n，切换语言实时刷新；
  *     → 新增「整组下载（相册 + 评论区）」与「下载目录」：选定目录后整组/批量/单条
  *       统一流式写入同一文件夹（File System Access API，句柄持久化到 IndexedDB）。
+ *
+ *  E. 本仓库合并（GMScript）
+ *     → 与旧 `telegram-media-downloader.telegram-only.user.js`（v1.0.7）合并为单一脚本，
+ *       旧版由此文件完全取代，不再单独维护。
+ *     → 继承旧版的**严格 @match**（只放行 web/webk/webz 三个 Telegram Web 域名），
+ *       不使用上游的 `https://*.telegram.org/*` 通配，杜绝在无关子域注入。
+ *     → 继承旧版**剥离第三方推广注入**的原则：本文件不含任何推广、邀请、统计外链。
+ *     → `@updateURL` / `@downloadURL` 固定指向本仓库 raw 地址，版本号只由 `@version` 承载。
  */
 
 (function () {
   "use strict";
+
+  /* ------------------------------------------------------------------ *
+   * 0. 运行时域名守卫                                                    *
+   * ------------------------------------------------------------------ *
+   * @match 已收窄到三个 Telegram Web 子域，这里再兜一层：即便有人手动放宽
+   * 匹配规则（或脚本管理器忽略 @match），也绝不在非 telegram.org 站点注入。 */
+  if (!/(^|\.)telegram\.org$/.test(location.hostname)) return;
 
   /* ------------------------------------------------------------------ *
    * 1. 常量                                                             *

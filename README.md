@@ -26,13 +26,15 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js)
 
-#### 2. Telegram Media Downloader (Optimized & Enhanced) · v1.0.7
+#### 2. Telegram Media Downloader Pro · v3.0.0
 
 ```
-https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js
+https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js
 ```
 
-👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js)
+👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js)
+
+<sub>本脚本由三份上游实现（Nestor Qin / yoshiko.wisoky / copyMister）合并而成，并取代旧版 `telegram-media-downloader.telegram-only.user.js`（v1.0.7，已下线）。**旧版用户请先卸载旧脚本再装这个**，两者 identity 不同，同时安装会重复注入下载面板。</sub>
 
 <sub>以上地址同时是 `@downloadURL` 与 `@updateURL`。脚本管理器会按此地址定期检查版本，**升级无需重新安装**。</sub>
 
@@ -41,7 +43,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 | 文件名 | 版本 | 说明 |
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
-| [`telegram-media-downloader.telegram-only.user.js`](userscripts/telegram-media-downloader.telegram-only.user.js) | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块 |
+| [`telegram-media-downloader.user.js`](userscripts/telegram-media-downloader.user.js) | 3.0.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**三份上游脚本合并版**：WebA(webz) + WebK(webk) 双端挂载、任务面板（取消 / 重试 / 续传 / 4 MB 分片）、原生 `downloadToDisc` 通道、右键菜单下载、选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 仅放行 web/webk/webz 三个子域 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。<br>显示名：`Telegram Media Downloader Pro` |
 
 ### 常见问题
 
@@ -57,6 +59,11 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 > ⚠️ **2026-10 结构变更**：两个脚本从仓库根目录移入了 `userscripts/` 子目录，raw 地址随之改变。
 > 脚本内的 `@updateURL` / `@downloadURL` 已同步改为新地址，**但你本机已安装的副本仍指向旧地址**。
 > 老用户需从上方新地址**重新安装一次**，之后即可恢复自动更新。旧地址（根目录）已失效，会返回 404。
+
+> ⚠️ **2026-10 TDL 合并**：`telegram-media-downloader.telegram-only.user.js`（v1.0.7）已从仓库移除，
+> 由合并版 `telegram-media-downloader.user.js`（v3.0.0，显示名 `Telegram Media Downloader Pro`）取代。
+> 两者 `@name` / `@namespace` 不同，脚本管理器视为两个独立脚本 —— **必须先卸载旧版**，再装新版，
+> 否则两个面板会同时出现。旧地址现已 404，装过旧版的用户不会收到自动更新，需手动迁移一次。
 
 ### 命名与更新约定
 
