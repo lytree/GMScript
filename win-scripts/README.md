@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | [`run-as-admin.cmd`](run-as-admin.cmd) | **一键提权入口**，双击即用 | 自动 |
 | [`set-system-env-pwsh7.ps1`](set-system-env-pwsh7.ps1) | 把 9 个环境变量写成**系统级**（Machine scope） | 需 |
-| [`windows-dev-setup.ps1`](windows-dev-setup.ps1) | 装 PowerShell 7 / Git / Git LFS（支持代理，**pwsh 7 only**） | 自动 |
+| [`windows-dev-setup.ps1`](windows-dev-setup.ps1) | 装 PowerShell 7 / Git / Git LFS / gsudo（支持代理，**pwsh 7 only**） | 自动 |
 | [`install-ffmpeg.ps1`](install-ffmpeg.ps1) + [`install-ffmpeg.bat`](install-ffmpeg.bat) | 装 FFmpeg 到 `E:\ffmpeg` | 否 |
 | [`irfanview-assoc.bat`](irfanview-assoc.bat) | IrfanView 图片关联（45 种格式），可撤销 | 否 |
 | [`ffmpeg-install.bat`](ffmpeg-install.bat) | FFmpeg 的早期纯 bat 版本，保留备用 | 否 |
@@ -100,7 +100,7 @@ registry=https://registry.npmmirror.com
 
 ## 装工具
 
-### PowerShell 7 / Git / Git LFS
+### PowerShell 7 / Git / Git LFS / gsudo
 
 ```powershell
 # 基础用法（无代理）
@@ -111,10 +111,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps
 
 # 只打印命令，不实际执行
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -DryRun
+
+# 跳过某一步（可组合）
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\windows-dev-setup.ps1 -SkipGsudo
 ```
 
 `#Requires -Version 7.0` —— **必须 pwsh 7**，不支持 5.1；会自动弹 UAC。
 退出码：`0` 成功 / `1` 有失败项 / `3` 版本不足（5.1）。
+
+gsudo 走 winget（`gerardog.gsudo`）装到默认目录 `C:\Program Files\gsudo`（MSI 不支持自定义路径），
+装完即可用 `gsudo <命令>` 提权执行单条命令。也可用 `-SkipGsudo` 跳过。
 
 ### FFmpeg
 
@@ -219,6 +225,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\win-scripts\finish-kali-wsl.ps1 
 | Node.js | v24.13.0 · `E:\nodejs` |
 | npm | 11.20.0（全局包区 `E:\node\modules`） |
 | IrfanView | 4.75 · 45 个图片格式已关联 |
+| gsudo | 2.6.1 · `C:\Program Files\gsudo\Current\` |
 | 环境变量 | 9 个系统级变量全部生效 |
 
 **未安装**：Git / Git LFS（`windows-dev-setup.ps1` 可装，尚未执行）
