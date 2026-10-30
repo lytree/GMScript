@@ -34,6 +34,14 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js)
 
+#### 3. Telegram Media Downloader (Merged) · v1.0.0
+
+```
+https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
+```
+
+👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js)
+
 <sub>以上地址同时是 `@downloadURL` 与 `@updateURL`。脚本管理器会按此地址定期检查版本，**升级无需重新安装**。</sub>
 
 ### 脚本列表
@@ -42,6 +50,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
 | [`telegram-media-downloader.telegram-only.user.js`](userscripts/telegram-media-downloader.telegram-only.user.js) | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块 |
+| [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.0.0 | 上述 telegram-only 变体与 `Telegram-Media-Downloader-Pro` 的功能合并版：受限频道下载、原生下载通道优先、任务面板（取消/重试/续传）、下载目录归档、批量下载、受保护消息文字复制；严格 `@match` + 运行时域名守卫，不含任何第三方推广横幅。仓库内同类的 Telegram 下载脚本**只装一个**，同时安装会出现重复按钮 |
 
 ### 常见问题
 
@@ -97,7 +106,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 .\win-scripts\irfanview-assoc.bat
 ```
 
-涵盖：系统级环境变量（uv / Python / Java / Maven / Node / vcpkg）、PowerShell 7 与 Git 安装、FFmpeg 安装、IrfanView 图片文件关联。
+涵盖：系统级环境变量（uv / Python / Java / Maven / Node / vcpkg）、PowerShell 7 与 Git 安装、gsudo 安装、FFmpeg 安装、IrfanView 图片文件关联。
 
 **约定**：`.ps1` 承载全部逻辑，`.bat` / `.cmd` 只做调用入口（定位 pwsh → 转发参数 → 透传退出码）。
 需要管理员权限的用 `.cmd` 入口（自动弹 UAC），不需要的用 `.bat`。
