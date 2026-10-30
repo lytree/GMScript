@@ -17,6 +17,8 @@
 
 > 前置条件：浏览器先装好 [Tampermonkey](https://www.tampermonkey.net/) 或 Violentmonkey。
 > 打开下面任一地址会弹出脚本管理器的安装页；若页面直接显示源码，说明没装脚本管理器。
+>
+> **同一功能的脚本只装一个。** Telegram 系请直接装 **#2 合并版**；已装旧版 `telegram-only`（#3）的用户，请在装合并版前先停用/删除 #3，否则媒体查看器里会出现重复按钮。
 
 #### 1. Get Microsoft Rewards (修复/增强版) · v1.0.8
 
@@ -26,7 +28,17 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js)
 
-#### 2. Telegram Media Downloader (Optimized & Enhanced) · v1.0.7
+#### 2. Telegram Media Downloader (Merged) · v1.0.0 · 推荐
+
+```
+https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
+```
+
+👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js)
+
+<sub>telegram-only 与 `Telegram-Media-Downloader-Pro` 的功能合并版：受限频道下载、原生下载通道优先、任务面板（取消 / 重试 / 续传）、下载目录归档、批量下载、受保护消息文字复制；不含任何第三方推广横幅。**注意：这是新的脚本身份**，从旧版切换过来需要重新安装一次（之后自动更新即可）。</sub>
+
+#### 3. Telegram Media Downloader (Optimized & Enhanced / telegram-only) · v1.0.7 · 旧版变体
 
 ```
 https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js
@@ -34,13 +46,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.telegram-only.user.js)
 
-#### 3. Telegram Media Downloader (Merged) · v1.0.0
-
-```
-https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
-```
-
-👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js)
+<sub>轻量实现，只负责受限频道的图片 / 视频 / 语音下载。功能已被 #2 合并版覆盖，保留此条仅为已装用户维持自动更新链路。</sub>
 
 <sub>以上地址同时是 `@downloadURL` 与 `@updateURL`。脚本管理器会按此地址定期检查版本，**升级无需重新安装**。</sub>
 
@@ -49,7 +55,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 | 文件名 | 版本 | 说明 |
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
-| [`telegram-media-downloader.telegram-only.user.js`](userscripts/telegram-media-downloader.telegram-only.user.js) | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块 |
+| [`telegram-media-downloader.telegram-only.user.js`](userscripts/telegram-media-downloader.telegram-only.user.js) | 1.0.7 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音消息。本仓库版本为 **telegram-only** 变体：严格 `@match` + 运行时域名守卫，已剥离第三方推广注入模块。**旧版变体，功能已被下一行的合并版覆盖** |
 | [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.0.0 | 上述 telegram-only 变体与 `Telegram-Media-Downloader-Pro` 的功能合并版：受限频道下载、原生下载通道优先、任务面板（取消/重试/续传）、下载目录归档、批量下载、受保护消息文字复制；严格 `@match` + 运行时域名守卫，不含任何第三方推广横幅。仓库内同类的 Telegram 下载脚本**只装一个**，同时安装会出现重复按钮 |
 
 ### 常见问题
@@ -59,6 +65,9 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 **装完不自动更新？**
 在脚本管理器里打开该脚本 → 设置 → 检查更新。若仍无反应，说明当前安装版本的 `@updateURL` 指向失效地址，重新访问上方安装地址覆盖安装一次即可恢复正常。
+
+**媒体查看器里出现两个下载按钮 / 面板重复？**
+说明同时启用了多个 Telegram 下载脚本（`telegram-only`、`merged`，或从别处装的 `Pro`）。在脚本管理器里只保留一个（推荐 `merged`），其余停用或删除并刷新页面。合并版是新的脚本身份，不会自动顶替 `telegram-only`。
 
 **我改了 `@name`，为什么老用户变成两个脚本？**
 `@name` + `@namespace` 共同构成 Tampermonkey 的脚本身份。发布后改动这两项会被视为新脚本，老用户既收不到更新、又会重复安装。
