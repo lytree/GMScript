@@ -1,33 +1,34 @@
 // ==UserScript==
-// @name         Telegram Media Downloader Pro
-// @name:zh-CN   Telegram 媒体下载器 Pro（受限频道 / 批量 / 复制文字）
-// @name:zh-TW   Telegram 媒體下載器 Pro（受限頻道 / 批次 / 複製文字）
-// @name:ru      Telegram Media Downloader Pro
-// @name:my      Telegram Media Downloader Pro
-// @version      3.0.0
-// @namespace    tel-media-downloader-pro
+// @name         Telegram Media Downloader (Merged)
+// @name:zh-CN   Telegram 媒体下载器（合并增强版）
+// @name:zh-TW   Telegram 媒體下載器（合併增強版）
+// @name:ru      Telegram Media Downloader (Merged)
+// @name:my      Telegram Media Downloader (Merged)
+// @version      1.0.0
+// @namespace    gmscript-telegram-media-downloader
 // @description        Download images, videos, voice messages and files from Telegram Web — including restricted "no-forward" chats. Batch-save selected media, cancel/retry/resume downloads from a progress panel, and copy text from protected messages.
 // @description:zh-CN  从 Telegram 网页版下载图片、视频、语音与文件（含禁止转发的受限频道）。支持批量保存所选媒体、可取消/重试/续传的下载面板，并恢复受保护消息的文字复制。
 // @description:zh-TW  從 Telegram 網頁版下載圖片、影片、語音與檔案（含禁止轉發的受限頻道）。支援批次儲存所選媒體、可取消/重試/續傳的下載面板，並恢復受保護訊息的文字複製。
 // @description:ru     Загружайте изображения, видео, голосовые сообщения и файлы из Telegram Web, включая каналы с запретом пересылки. Пакетная загрузка выбранных медиа, панель прогресса с отменой, повтором и докачкой, восстановление копирования текста в защищённых сообщениях.
 // @description:my     Telegram ဝဘ်မှ ပုံ၊ ဗီဒီယို၊ အသံနှင့် ဖိုင်များကို ဒေါင်းလုဒ်လုပ်ပါ (ပြန်ပို့မရသော ကန့်သတ်ချက်ရှိ ချန်နယ်များအပါအဝင်)။ ရွေးချယ်ထားသော မီဒီယာများကို အစုလိုက် သိမ်းဆည်းနိုင်ပြီး ဒေါင်းလုဒ်ကို ပယ်ဖျက်/ထပ်စမ်း/ဆက်လုပ်နိုင်သည်။
-// @author       Nestor Qin, yoshiko.wisoky, copyMister — merged
+// @author       Nestor Qin, Andrew, yoshiko.wisoky, copyMister — merged
 // @license      GNU GPLv3
 // @homepage     https://github.com/lytree/GMScript
 // @supportURL   https://github.com/lytree/GMScript/issues
 // @match        https://web.telegram.org/*
 // @match        https://webk.telegram.org/*
 // @match        https://webz.telegram.org/*
+// @match        https://*.telegram.org/*
 // @icon         https://img.icons8.com/color/452/telegram-app--v5.png
 // @grant        unsafeWindow
 // @noframes
 // @run-at       document-start
-// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js
-// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader.user.js
+// @downloadURL  https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
+// @updateURL    https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
 // ==/UserScript==
 
 /*
- * 合并说明（三份上游脚本 → 单一实现）
+ * 合并说明（四份上游脚本 → 单一实现）
  *
  *  A. "Telegram Media Downloader" (Nestor Qin, v2.01)
  *     → 保留：i18n（英/简中/繁中/俄/缅）、任务进度面板（取消/重试/续传）、
@@ -47,7 +48,14 @@
  *       受保护消息（.no-forwards）文字复制解锁。
  *     → 舍弃：强制跳转到 webk 的 location.replace（会打断 WebA 用户）。
  *
- *  D. 本次优化
+ *  D. "Telegram Media Downloader (Optimized & Enhanced)" / telegram-only 变体 (Andrew)
+ *     → 保留：严格 @match + 运行时域名守卫（仅在 telegram.org 生效）；
+ *       受限媒体查看器中被隐藏的下载/转发控件的还原（按用途与已学字形识别）；
+ *       WebA 快拍、WebK 快拍与置顶音频的挂载点位。
+ *     → 舍弃：GrabVideo Bot 第三方推广横幅、window.onerror 兜底吞错、
+ *       无校验的分片循环与自带进度面板（已由 A/B 的实现取代）。
+ *
+ *  E. 本次优化
  *     → 单一 MutationObserver（100 ms 去抖）+ 作用域过滤，替代三套观察器；
  *     → 统一两条下载通道：原生媒体对象优先，URL 分片兜底（失败自动回退）；
  *     → 合并重复的图标/文件名/本地化逻辑；并发与队列集中管理；
@@ -69,11 +77,10 @@
   "use strict";
 
   /* ------------------------------------------------------------------ *
-   * 0. 运行时域名守卫                                                    *
-   * ------------------------------------------------------------------ *
-   * @match 已收窄到三个 Telegram Web 子域，这里再兜一层：即便有人手动放宽
-   * 匹配规则（或脚本管理器忽略 @match），也绝不在非 telegram.org 站点注入。 */
-  if (!/(^|\.)telegram\.org$/.test(location.hostname)) return;
+   * 0. 站点守卫（与 @match 形成双重保险）                                 *
+   * ------------------------------------------------------------------ */
+  const TELEGRAM_HOST_RE = /^(?:[a-z0-9-]+\.)*telegram\.org$/i;
+  if (!TELEGRAM_HOST_RE.test(String(location.hostname || ""))) return;
 
   /* ------------------------------------------------------------------ *
    * 1. 常量                                                             *
@@ -670,6 +677,33 @@
         return;
       }
     };
+    // 受限聊天里被隐藏的转发按钮：同样只学原生按钮的字形，不写死码点。
+    const WEB_K_FORWARD_BUTTON_SELECTOR = [
+      "button.tgico-forward",
+      'button[aria-label="Forward"]',
+      'button[title="Forward"]',
+    ].join(", ");
+    let webKForwardGlyph = "";
+    const readButtonGlyph = (button) => {
+      const glyph =
+        button.querySelector(":scope > .tgico")?.textContent.trim() || button.textContent.trim();
+      // 图标必须是单个私有区码点，忽略标签与菜单内容。
+      return glyph && /^[\uE000-\uF8FF]$/.test(glyph) ? glyph : "";
+    };
+    const refreshWebKForwardGlyph = () => {
+      for (const button of document.querySelectorAll(WEB_K_FORWARD_BUTTON_SELECTOR)) {
+        if (button.matches(`.tel-download, .${CONFIG.pinnedButtonClass}`)) continue;
+        const glyph = readButtonGlyph(button);
+        if (!glyph) continue;
+        // 仅存内存：重新加载页面后字体可能已更换。
+        webKForwardGlyph = glyph;
+        return;
+      }
+    };
+    // 旧版 WebK 的隐藏动作按钮不带用途类名，只剩图标字体码点；
+    // 码点会随版本变化，仅作兜底，识别失败时不影响其他逻辑。
+    const LEGACY_DOWNLOAD_GLYPHS = new Set(["\uE983", "\uE962", "\uE980", "\uE979", "\uE95A"]);
+    const LEGACY_FORWARD_GLYPHS = new Set(["\uE9A4", "\uE99A", "\uE960", "\uE976"]);
 
     /* 8.2 分片下载引擎 ------------------------------------------------- */
     const contentRangeRegex = /^bytes (\d+)-(\d+)\/(\d+)$/;
@@ -1558,10 +1592,34 @@
       );
       if (!mediaAspecter || !mediaButtons) return;
 
-      // 只还原可识别的下载控件；其他隐藏操作可能对该媒体本就不可用。
-      for (const button of getWebKDownloadButtons(mediaButtons)) {
-        if (!button.disabled && button.getAttribute("aria-disabled") !== "true") {
-          button.classList.remove("hide");
+      // 还原受限媒体里被隐藏的下载/转发控件；其余隐藏操作可能对该媒体本就不可用。
+      refreshWebKForwardGlyph();
+      const classifyHiddenAction = (button) => {
+        const glyph = readButtonGlyph(button);
+        if (
+          button.matches(WEB_K_DOWNLOAD_BUTTON_SELECTOR) ||
+          (webKDownloadGlyph && glyph === webKDownloadGlyph) ||
+          LEGACY_DOWNLOAD_GLYPHS.has(glyph)
+        ) {
+          return "download";
+        }
+        if (
+          button.matches(WEB_K_FORWARD_BUTTON_SELECTOR) ||
+          (webKForwardGlyph && glyph === webKForwardGlyph) ||
+          LEGACY_FORWARD_GLYPHS.has(glyph)
+        ) {
+          return "forward";
+        }
+        return null;
+      };
+      for (const button of mediaButtons.querySelectorAll("button.hide")) {
+        if (button.disabled || button.getAttribute("aria-disabled") === "true") continue;
+        const action = classifyHiddenAction(button);
+        if (!action) continue;
+        button.classList.remove("hide");
+        // 仅在原按钮丢了用途类名时补类，避免图标重复渲染。
+        if (!Array.from(button.classList).some((name) => name.startsWith("tgico-"))) {
+          button.classList.add(`tgico-${action}`);
         }
       }
 

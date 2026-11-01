@@ -4,9 +4,9 @@
     Windows 开发环境一键安装 / 配置脚本（需要 PowerShell 7 / pwsh）。
 
 .DESCRIPTION
-    通过 winget 安装最新版的 PowerShell 7(pwsh)、Git、Git LFS（默认优先装到 D 盘），
-    并以「系统级」写入 VCPKG_ROOT / MAVEN_HOME / JAVA_HOME / NODE_HOME 四个环境变量，
-    同时把这些目录追加进系统 PATH（去重、不重复写）。
+    通过 winget 安装最新版的 PowerShell 7(pwsh)、Git、Git LFS（默认优先装到 D 盘）、
+    gsudo（装到默认目录），并以「系统级」写入 VCPKG_ROOT / MAVEN_HOME / JAVA_HOME /
+    NODE_HOME 四个环境变量，同时把这些目录追加进系统 PATH（去重、不重复写）。
 
     脚本会自动提权（需要管理员，因为要写系统环境变量）；
     从网络管道执行（irm | iex）时会先把自身落盘为临时文件再提权重启。
@@ -58,6 +58,7 @@ param(
     [switch] $SkipPwsh,
     [switch] $SkipGit,
     [switch] $SkipGitLfs,
+    [switch] $SkipGsudo,
     [switch] $SkipEnvVars,
 
     # 不自动提权（默认会自动提权；不提权时写系统环境变量会失败）
@@ -97,7 +98,7 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
 $Script:StartTime = Get-Date
 $Script:LogFile = Join-Path $env:TEMP ('windows-dev-setup-{0}.log' -f $Script:StartTime.ToString('yyyyMMdd-HHmmss'))
 $Script:StepNo = 0
-$Script:StepTotal = 5
+$Script:StepTotal = 6
 $Script:Failed = New-Object System.Collections.ArrayList
 $Script:Skipped = New-Object System.Collections.ArrayList
 
@@ -243,6 +244,7 @@ function Invoke-SelfElevated {
     if ($SkipPwsh)                 { $argList += '-SkipPwsh' }
     if ($SkipGit)                  { $argList += '-SkipGit' }
     if ($SkipGitLfs)               { $argList += '-SkipGitLfs' }
+    if ($SkipGsudo)                { $argList += '-SkipGsudo' }
     if ($SkipEnvVars)              { $argList += '-SkipEnvVars' }
     if ($DryRun)                   { $argList += '-DryRun' }
     if ($Pause)                    { $argList += '-Pause' }
@@ -497,7 +499,7 @@ function Test-CommandVersion {
 # 7. 主流程
 # --------------------------------------------------------------------------------------
 function Invoke-Main {
-    Write-Log 'Windows 开发环境一键配置 · PowerShell 7 / Git / Git LFS / 环境变量' -Level Info
+    Write-Log 'Windows 开发环境一键配置 · PowerShell 7 / Git / Git LFS / gsudo / 环境变量' -Level Info
     Write-Log ("完整日志：{0}" -f $Script:LogFile) -Level Info
 
     # --- 提权 ---
@@ -591,7 +593,27 @@ function Invoke-Main {
         }
     }
 
-    # --- 4. 环境变量 ---
+    # --- 4. gsudo ---
+    Write-StepHeader '安装 gsudo（sudo for Windows）'
+    if ($SkipGsudo) {
+        Add-Skipped 'gsudo'
+    } else {
+        try {
+            # gsudo 是 MSI 安装包，不支持自定义目录；装到默认的 C:\Program Files\gsudo
+            $ok = Sync-WingetPackage -Id 'gerardog.gsudo' -DisplayName 'gsudo'
+            if ($ok) {
+                $v = Test-CommandVersion -Command 'gsudo' -Arguments @('--version')
+                if ($v) { Write-Log "验证：$v" -Level Ok } else { Write-Log '当前会话尚找不到 gsudo，新开终端后可用。' -Level Info }
+            } else {
+                Add-Failed 'gsudo (gerardog.gsudo)'
+            }
+        } catch {
+            Write-Log $_.Exception.Message -Level Err
+            Add-Failed 'gsudo (gerardog.gsudo)'
+        }
+    }
+
+    # --- 5. 环境变量 ---
     Write-StepHeader '写入系统环境变量'
     if ($SkipEnvVars) {
         Add-Skipped '系统环境变量'
@@ -633,6 +655,7 @@ function Invoke-Main {
         @{ Label = 'pwsh      '; Cmd = 'pwsh'; Args = @('-NoProfile', '-v') },
         @{ Label = 'git       '; Cmd = 'git'; Args = @('--version') },
         @{ Label = 'git-lfs   '; Cmd = 'git'; Args = @('lfs', 'version') },
+        @{ Label = 'gsudo     '; Cmd = 'gsudo'; Args = @('--version') },
         @{ Label = 'java      '; Cmd = 'java'; Args = @('-version') },
         @{ Label = 'maven     '; Cmd = 'mvn'; Args = @('-v') },
         @{ Label = 'node      '; Cmd = 'node'; Args = @('-v') }
