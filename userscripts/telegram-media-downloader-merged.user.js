@@ -18,7 +18,6 @@
 // @match        https://web.telegram.org/*
 // @match        https://webk.telegram.org/*
 // @match        https://webz.telegram.org/*
-// @match        https://*.telegram.org/*
 // @icon         https://img.icons8.com/color/452/telegram-app--v5.png
 // @grant        unsafeWindow
 // @noframes
