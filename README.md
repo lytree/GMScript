@@ -28,7 +28,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js)
 
-#### 2. Telegram Media Downloader (Merged) · v1.0.0 · 推荐
+#### 2. Telegram Media Downloader (Merged) · v1.1.0 · 推荐
 
 ```
 https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js
@@ -36,7 +36,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-media-downloader-merged.user.js)
 
-<sub>由三份上游实现（Nestor Qin / yoshiko.wisoky / copyMister）与旧 `telegram-only` 变体合并而成的单一实现：受限频道下载、WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先、任务面板（取消 / 重试 / 续传 / 4 MB 分片）、右键菜单与选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n；不含任何推广 / 邀请 / 统计外链。**注意：这是新的脚本身份**，旧版 `telegram-only`（v1.0.7）已下线，请先停用/卸载旧版再装本脚本，否则媒体查看器会出现重复按钮。</sub>
+<sub>由三份上游实现（Nestor Qin / yoshiko.wisoky / copyMister）与旧 `telegram-only` 变体合并而成的单一实现：受限频道下载、WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单与选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n；不含任何推广 / 邀请 / 统计外链。**注意：这是新的脚本身份**，旧版 `telegram-only`（v1.0.7）已下线，请先停用/卸载旧版再装本脚本，否则媒体查看器会出现重复按钮。</sub>
 
 #### 3. WPS Auto Sign-in (自动签到) · v1.0.0
 
@@ -55,7 +55,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-sign
 | 文件名 | 版本 | 说明 |
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
-| [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.0.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**旧 `telegram-only` 与 `Telegram-Media-Downloader-Pro` 的合并版**：WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先、任务面板（取消 / 重试 / 续传 / 4 MB 分片）、右键菜单下载、选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 严格限定 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。Telegram 下载脚本**只装这一个**。<br>显示名：`Telegram Media Downloader (Merged)` |
+| [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.1.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**旧 `telegram-only` 与 `Telegram-Media-Downloader-Pro` 的合并版**：WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单下载、选择栏批量下载（面板显示 `n/N` 条目进度与当前文件名、可取消）、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 严格限定 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。Telegram 下载脚本**只装这一个**。<br>显示名：`Telegram Media Downloader (Merged)` |
 | [`wps-auto-signin.user.js`](userscripts/wps-auto-signin.user.js) | 1.0.0 | WPS 自动签到助手：每日签到（领会员 + 积分）、福利中心打卡领会员、天天抽奖。登录 WPS 后自动运行，零配置；带本地单元 / 端到端测试。<br>显示名：`WPS Auto Sign-in (自动签到)` |
 
 ### 常见问题
@@ -80,7 +80,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-sign
 > 已安装该旧版的用户请先卸载旧版，再安装上面的合并版。
 
 > ⚠️ **2026-10 TDL 合并**：`telegram-media-downloader.telegram-only.user.js`（v1.0.7）已从仓库移除，
-> 由合并版 `telegram-media-downloader-merged.user.js`（v1.0.0，显示名 `Telegram Media Downloader (Merged)`）取代。
+> 由合并版 `telegram-media-downloader-merged.user.js`（v1.1.0，显示名 `Telegram Media Downloader (Merged)`）取代。
 > 两者 `@name` / `@namespace` 不同，脚本管理器视为两个独立脚本 —— **必须先卸载旧版**，再装新版，
 > 否则两个面板会同时出现。旧地址现已 404，装过旧版的用户不会收到自动更新，需手动迁移一次。
 

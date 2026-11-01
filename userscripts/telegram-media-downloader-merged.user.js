@@ -4,7 +4,7 @@
 // @name:zh-TW   Telegram 媒體下載器（合併增強版）
 // @name:ru      Telegram Media Downloader (Merged)
 // @name:my      Telegram Media Downloader (Merged)
-// @version      1.0.0
+// @version      1.1.0
 // @namespace    gmscript-telegram-media-downloader
 // @description        Download images, videos, voice messages and files from Telegram Web — including restricted "no-forward" chats. Batch-save selected media, cancel/retry/resume downloads from a progress panel, and copy text from protected messages.
 // @description:zh-CN  从 Telegram 网页版下载图片、视频、语音与文件（含禁止转发的受限频道）。支持批量保存所选媒体、可取消/重试/续传的下载面板，并恢复受保护消息的文字复制。
@@ -330,6 +330,11 @@
       params.mime ||= t("unknownType");
     }
     return t(error.translationKey, params);
+  };
+  // 批量时的「已用时」心跳：大文件一条要下很久，进度条不动时靠它证明还活着。
+  const formatElapsed = (ms) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   };
   const localizeDownloadButton = (button, loading = false) => {
     const label = t(loading ? "loadingMedia" : "download");
@@ -909,8 +914,13 @@
           ? `${integerFormat.format(percent)}%`
           : label;
       const speed = task.received / Math.max((performance.now() - task.startedAt) / 1000, 0.1);
+      // 批量任务按「条」计数，并露出当前正在处理的那一条与已用时，否则看起来像进度不动。
       card.querySelector(".tel-task-details").textContent = task.batch
-        ? `${integerFormat.format(task.received)} / ${integerFormat.format(task.total ?? 0)}`
+        ? `${integerFormat.format(task.received)} / ${integerFormat.format(task.total ?? 0)}` +
+          (task.state === "downloading"
+            ? ` · ${formatElapsed(performance.now() - task.startedAt)}` +
+              (task.currentName ? ` · ${task.currentName}` : "")
+            : "")
         : formatBytes(task.received) +
           (task.total !== null ? ` / ${formatBytes(task.total)}` : "") +
           (task.state === "downloading" && task.received
@@ -935,6 +945,7 @@
       if (task.finished) return;
       task.finished = true;
       clearTimeout(task.progressTimer);
+      clearInterval(task.ticker);
       task.state = state;
       task.error = error;
       if (activeDownloads.get(task.key) === task) activeDownloads.delete(task.key);
@@ -1322,18 +1333,27 @@
           } catch (error) {
             logger.error("Archive folder unavailable, using root folder:", error);
           }
-          for (const entry of entries) {
-            if (entry.url) {
-              downloadMedia(entry.url, entry.kind, {
-                directory: archive,
-                fileName: entry.name,
-              });
-            } else if (entry.message) {
-              nativeDownload(entry.message).catch((error) =>
-                logger.error("Group item failed:", error)
-              );
+          // 串行处理并挂聚合进度：原来是一口气全部入队，面板里看不到整体进度。
+          const task = createBatchTask(entries.length, t("menuGroupDownload"));
+          for (let i = 0; i < entries.length; i += 1) {
+            if (task.controller.signal.aborted) break;
+            const entry = entries[i];
+            beginBatchItem(task, i, entry.name || batchItemName(entry.message));
+            try {
+              if (entry.url) {
+                await downloadMedia(entry.url, entry.kind, {
+                  directory: archive,
+                  fileName: entry.name,
+                });
+              } else if (entry.message) {
+                await nativeDownload(entry.message);
+              }
+            } catch (error) {
+              logger.error("Batch item failed:", error);
             }
+            settleBatchItem(task, i);
           }
+          closeBatchTask(task, "completed");
           return;
         }
       }
@@ -1341,25 +1361,19 @@
       if (messages.length) await startBatchDownload(messages.map((message) => ({ message })));
     };
 
-    // 串行下载一组消息，进度显示在任务面板；返回 Promise。
-    const startBatchDownload = async (items) => {
-      if (!items.length) return;
-      if (items.length === 1) {
-        nativeDownload(items[0].message).catch((error) =>
-          logger.error("Download failed:", error)
-        );
-        return;
-      }
+    /* 8.3.1 批量任务卡（选择栏批量与整组下载共用） --------------------- */
+    const createBatchTask = (total, title) => {
       const task = {
         id: Math.random().toString(36).slice(2) + Date.now().toString(36),
         key: `batch:${Date.now()}`,
         url: "batch",
         kind: "batch",
         batch: true,
-        fileName: t("menuGroupDownload"),
+        fileName: title || t("batchTitle"),
         state: "downloading",
         received: 0,
-        total: items.length,
+        total,
+        currentName: "",
         controller: new AbortController(),
         startedAt: performance.now(),
         renderedAt: 0,
@@ -1371,27 +1385,73 @@
       downloadTasks.set(task.id, task);
       showTask(task);
       task.running = true;
+      // 每秒重绘一次，让「已用时」持续走动，避免大文件期间看着像卡死。
+      task.ticker = setInterval(() => {
+        if (!task.finished) renderTask(task);
+      }, 1000);
+      return task;
+    };
+
+    // 处理第 index 条（0 起）之前调用：进度停在「已完成条数」，并露出当前文件名。
+    const beginBatchItem = (task, index, name) => {
+      task.received = index;
+      task.currentName = name || "";
+      renderTask(task);
+    };
+
+    // 无论成败都推进一格，否则失败项会让进度条永久卡住。
+    const settleBatchItem = (task, index) => {
+      task.received = index + 1;
+      renderTask(task);
+      // 目录模式下每条还会生成自己的卡，聚合卡需要保持在列表最上面。
+      const card = document.getElementById(CONFIG.cardPrefix + task.id);
+      const list = document.querySelector(`#${CONFIG.panelId} .tel-task-list`);
+      if (card && list && list.firstElementChild !== card) list.prepend(card);
+    };
+
+    const closeBatchTask = (task, state) => {
+      task.running = false;
+      task.currentName = "";
+      if (task.controller.signal.aborted || state === "cancelled") {
+        finishTask(task, "cancelled");
+        return;
+      }
+      task.received = task.total ?? task.received;
+      finishTask(task, state);
+      setTimeout(() => dismissTask(task), 8000);
+    };
+
+    // 批量项的文件名：优先用消息里的真实文件名，否则按 mid 推一个占位名。
+    const batchItemName = (message) => {
+      const media = mediaOf(message);
+      if (!media) return "";
+      return getMessageFileName(media, "", media.media?.document ? "video" : "image");
+    };
+
+    // 串行下载一组消息，进度显示在任务面板；返回 Promise。
+    const startBatchDownload = async (items) => {
+      if (!items.length) return;
+      if (items.length === 1) {
+        nativeDownload(items[0].message).catch((error) =>
+          logger.error("Download failed:", error)
+        );
+        return;
+      }
+      const task = createBatchTask(items.length, t("menuGroupDownload"));
       for (let i = 0; i < items.length; i += 1) {
         if (task.controller.signal.aborted) break;
-        task.received = i;
-        renderTask(task);
+        beginBatchItem(task, i, items[i].name || batchItemName(items[i].message));
         try {
           await nativeDownload(items[i].message);
         } catch (error) {
-          logger.error("Group item failed:", error);
+          logger.error("Batch item failed:", error);
         }
+        settleBatchItem(task, i);
         if (i < items.length - 1 && !task.controller.signal.aborted) {
           await new Promise((resolve) => setTimeout(resolve, CONFIG.batchGap));
         }
       }
-      task.running = false;
-      if (task.controller.signal.aborted) {
-        finishTask(task, "cancelled");
-        return;
-      }
-      task.received = items.length;
-      finishTask(task, "handedOff");
-      setTimeout(() => dismissTask(task), 8000);
+      closeBatchTask(task, "handedOff");
     };
 
     /* 8.4 下载按钮工厂 ------------------------------------------------- */
@@ -1800,12 +1860,20 @@
       const permission = requestDirectoryPermission(directoryHandle);
       // 尚未设置目录时，首次点击批量按钮直接弹目录选择，后续复用。
       const pickedRoot = directoryHandle ? null : pickArchiveRoot();
+      let task = null;
       const restore = () => {
         batchBusy = false;
         button.disabled = false;
         button.style.opacity = "";
         if (label) label.textContent = t("batchShort");
         localizeBatchButton();
+      };
+      const closeSelection = () => {
+        try {
+          selection?.cancelSelection?.();
+        } catch {
+          /* 部分分支无此方法 */
+        }
       };
       let messages;
       try {
@@ -1823,10 +1891,13 @@
       batchBusy = true;
       button.disabled = true;
       button.style.opacity = "0.6";
+      // 一开跑就在面板里建聚合卡：按钮上的 n/N 太小容易看不见，面板才是主进度来源。
+      task = createBatchTask(media.length, t("batchTitle"));
 
       const batchRoot = directoryHandle || (pickedRoot ? await pickedRoot.catch(() => null) : null);
       if (batchRoot) {
         // 目录模式：按「会话/日期」归档，相册项各自进 album-<id> 子目录。
+        // 单条仍走分片通道（有字节进度、各自建卡），聚合卡只负责 n/N 与取消。
         if (permission) await permission.catch(() => "denied");
         let dateFolder = batchRoot;
         try {
@@ -1849,8 +1920,10 @@
           return folderCache.get(key);
         };
         for (let i = 0; i < media.length; i += 1) {
+          if (task.controller.signal.aborted) break;
           if (label) label.textContent = `${i + 1}/${media.length}`;
           const entry = findRenderedMediaEntry(media[i]);
+          beginBatchItem(task, i, entry?.name || batchItemName(media[i]));
           const folder = await folderFor(media[i]?.groupedId);
           try {
             if (entry) {
@@ -1864,32 +1937,32 @@
           } catch (error) {
             logger.error("Batch item failed:", error);
           }
+          settleBatchItem(task, i);
         }
         restore();
-        try {
-          selection?.cancelSelection?.();
-        } catch {
-          /* 部分分支无此方法 */
-        }
+        closeBatchTask(task, "completed");
+        closeSelection();
         return;
       }
 
       // 串行且带间隔：多个并发 Service Worker 交付会退化为内存 Blob，大文件必失败。
       for (let i = 0; i < media.length; i += 1) {
+        if (task.controller.signal.aborted) break;
         if (label) label.textContent = `${i + 1}/${media.length}`;
+        beginBatchItem(task, i, batchItemName(media[i]));
         try {
           await nativeDownload(media[i]);
         } catch (error) {
           logger.error("Batch item failed:", error);
         }
-        if (i < media.length - 1) await new Promise((resolve) => setTimeout(resolve, CONFIG.batchGap));
+        settleBatchItem(task, i);
+        if (i < media.length - 1 && !task.controller.signal.aborted) {
+          await new Promise((resolve) => setTimeout(resolve, CONFIG.batchGap));
+        }
       }
       restore();
-      try {
-        selection?.cancelSelection?.();
-      } catch {
-        /* 部分分支无此方法 */
-      }
+      closeBatchTask(task, "handedOff");
+      closeSelection();
     };
 
     const addBatchButton = (wrapper) => {
@@ -2098,7 +2171,12 @@
       #${CONFIG.panelId} .tel-panel-heading, #${CONFIG.panelId} .tel-task-heading {
         display: flex; align-items: center; justify-content: space-between; gap: 8px;
       }
-      #${CONFIG.panelId} .tel-panel-heading { padding: 10px 12px; flex-shrink: 0; }
+      #${CONFIG.panelId} .tel-panel-heading {
+        padding: 10px 12px; flex-shrink: 0;
+        cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+      }
+      #${CONFIG.panelId}.tel-panel-dragging .tel-panel-heading { cursor: grabbing; }
+      #${CONFIG.panelId}.tel-panel-dragging { box-shadow: 0 12px 40px #0006; }
       #${CONFIG.panelId} .tel-panel-title { min-width: 0; overflow-wrap: anywhere; }
       #${CONFIG.panelId} .tel-panel-tools { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
       #${CONFIG.panelId} .tel-language-setting { display: flex; align-items: center; gap: 8px; padding: 0 12px 10px; flex-shrink: 0; }
@@ -2134,6 +2212,114 @@
     `;
     (document.head || document.documentElement).appendChild(style);
     document.body.appendChild(panel);
+
+    /* 8.9.1 面板拖拽：抓标题栏可移动，位置写 localStorage ------------- */
+    const PANEL_POS_KEY = "tel-media-downloader-panel-position";
+    let panelDrag = null;
+
+    const writePanelPosition = (position) => {
+      try {
+        localStorage.setItem(PANEL_POS_KEY, JSON.stringify(position));
+      } catch {
+        /* 隐私模式 / 存储被禁用时，本次会话内仍然生效 */
+      }
+    };
+
+    // 面板尺寸随任务数变化，每次定位都按当前 rect 夹回视口内。
+    const clampPanelPosition = (left, top) => {
+      const rect = panel.getBoundingClientRect();
+      const width = rect.width || 340;
+      const height = Math.min(rect.height || 120, window.innerHeight);
+      return {
+        left: Math.min(Math.max(0, left), Math.max(0, window.innerWidth - width)),
+        top: Math.min(Math.max(0, top), Math.max(0, window.innerHeight - height)),
+      };
+    };
+
+    const applyPanelPosition = (left, top, persist) => {
+      const next = clampPanelPosition(left, top);
+      panel.style.left = `${Math.round(next.left)}px`;
+      panel.style.top = `${Math.round(next.top)}px`;
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+      if (persist) writePanelPosition(next);
+      return next;
+    };
+
+    const resetPanelPosition = () => {
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.right = "";
+      panel.style.bottom = "";
+      panelDrag = null;
+      panel.classList.remove("tel-panel-dragging");
+      try {
+        localStorage.removeItem(PANEL_POS_KEY);
+      } catch {
+        /* 同上 */
+      }
+    };
+
+    const restorePanelPosition = () => {
+      let saved = null;
+      try {
+        saved = JSON.parse(localStorage.getItem(PANEL_POS_KEY) || "null");
+      } catch {
+        saved = null;
+      }
+      if (Number.isFinite(saved?.left) && Number.isFinite(saved?.top)) {
+        applyPanelPosition(saved.left, saved.top, false);
+      }
+    };
+
+    const panelHeading = panel.querySelector(".tel-panel-heading");
+    panelHeading?.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      // 标题栏右侧是设置/折叠按钮，拖动交给它们自己。
+      if (event.target instanceof Element && event.target.closest("button")) return;
+      const rect = panel.getBoundingClientRect();
+      if (!rect.width) return;
+      panelDrag = {
+        id: event.pointerId,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
+      panel.classList.add("tel-panel-dragging");
+      panelHeading.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    });
+    panelHeading?.addEventListener("pointermove", (event) => {
+      if (!panelDrag || event.pointerId !== panelDrag.id) return;
+      applyPanelPosition(
+        event.clientX - panelDrag.offsetX,
+        event.clientY - panelDrag.offsetY,
+        false
+      );
+    });
+    const endPanelDrag = (event) => {
+      if (!panelDrag || event.pointerId !== panelDrag.id) return;
+      panelDrag = null;
+      panel.classList.remove("tel-panel-dragging");
+      panelHeading.releasePointerCapture?.(event.pointerId);
+      const rect = panel.getBoundingClientRect();
+      if (rect.width) {
+        writePanelPosition({ left: Math.round(rect.left), top: Math.round(rect.top) });
+      }
+    };
+    panelHeading?.addEventListener("pointerup", endPanelDrag);
+    panelHeading?.addEventListener("pointercancel", endPanelDrag);
+    // 双击标题栏复位到右下角：面板拖出视野后有个找回来的办法。
+    panelHeading?.addEventListener("dblclick", (event) => {
+      if (event.target instanceof Element && event.target.closest("button")) return;
+      resetPanelPosition();
+    });
+    window.addEventListener("resize", () => {
+      if (!panel.style.left) return;
+      const rect = panel.getBoundingClientRect();
+      if (rect.width) applyPanelPosition(rect.left, rect.top, true);
+    });
+    restorePanelPosition();
+
     refreshLanguage();
     readDirectoryHandle()
       .then((handle) => {
