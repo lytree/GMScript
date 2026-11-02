@@ -4,7 +4,7 @@
 // @name:zh-TW   Telegram 媒體下載器（合併增強版）
 // @name:ru      Telegram Media Downloader (Merged)
 // @name:my      Telegram Media Downloader (Merged)
-// @version      1.1.0
+// @version      1.2.0
 // @namespace    gmscript-telegram-media-downloader
 // @description        Download images, videos, voice messages and files from Telegram Web — including restricted "no-forward" chats. Batch-save selected media, cancel/retry/resume downloads from a progress panel, and copy text from protected messages.
 // @description:zh-CN  从 Telegram 网页版下载图片、视频、语音与文件（含禁止转发的受限频道）。支持批量保存所选媒体、可取消/重试/续传的下载面板，并恢复受保护消息的文字复制。
@@ -142,7 +142,7 @@
       download: "Download", loadingMedia: "Media is loading", hide: "Hide", show: "Show",
       dismiss: "Dismiss download", progress: "Download progress", cancel: "Cancel", retry: "Retry",
       settings: "Settings", language: "Interface language", automatic: "Browser language",
-      folder: "Download folder", chooseFolder: "Choose folder", folderChosen: "Folder: {name}",
+      folder: "Download folder", chooseFolder: "Choose folder", folderDefault: "System download folder", folderChosen: "Folder: {name}",
       clearFolder: "Clear folder", folderDenied: "Folder access was denied",
       preparing: "Preparing", queued: "Queued", downloading: "Downloading", saving: "Saving",
       completed: "Completed", handedOff: "Sent to browser", failed: "Failed", cancelled: "Cancelled",
@@ -168,7 +168,7 @@
       download: "下载", loadingMedia: "媒体正在加载", hide: "收起", show: "展开",
       dismiss: "移除下载卡片", progress: "下载进度", cancel: "取消", retry: "重试",
       settings: "设置", language: "界面语言", automatic: "跟随浏览器",
-      folder: "下载目录", chooseFolder: "选择文件夹", folderChosen: "目录：{name}",
+      folder: "下载目录", chooseFolder: "选择文件夹", folderDefault: "系统默认下载目录", folderChosen: "目录：{name}",
       clearFolder: "清除目录", folderDenied: "文件夹权限被拒绝",
       preparing: "准备中", queued: "排队中", downloading: "下载中", saving: "保存中",
       completed: "已完成", handedOff: "已交给浏览器", failed: "失败", cancelled: "已取消",
@@ -194,7 +194,7 @@
       download: "下載", loadingMedia: "媒體正在載入", hide: "收合", show: "展開",
       dismiss: "移除下載卡片", progress: "下載進度", cancel: "取消", retry: "重試",
       settings: "設定", language: "介面語言", automatic: "跟隨瀏覽器",
-      folder: "下載目錄", chooseFolder: "選擇資料夾", folderChosen: "目錄：{name}",
+      folder: "下載目錄", chooseFolder: "選擇資料夾", folderDefault: "系統預設下載資料夾", folderChosen: "目錄：{name}",
       clearFolder: "清除目錄", folderDenied: "資料夾權限被拒絕",
       preparing: "準備中", queued: "排隊中", downloading: "下載中", saving: "儲存中",
       completed: "已完成", handedOff: "已交給瀏覽器", failed: "失敗", cancelled: "已取消",
@@ -220,7 +220,7 @@
       download: "Скачать", loadingMedia: "Медиа загружается", hide: "Свернуть", show: "Развернуть",
       dismiss: "Убрать карточку загрузки", progress: "Ход загрузки", cancel: "Отменить", retry: "Повторить",
       settings: "Настройки", language: "Язык интерфейса", automatic: "Язык браузера",
-      folder: "Папка загрузок", chooseFolder: "Выбрать папку", folderChosen: "Папка: {name}",
+      folder: "Папка загрузок", chooseFolder: "Выбрать папку", folderDefault: "Системная папка загрузок", folderChosen: "Папка: {name}",
       clearFolder: "Очистить папку", folderDenied: "Доступ к папке отклонён",
       preparing: "Подготовка", queued: "В очереди", downloading: "Загрузка", saving: "Сохранение",
       completed: "Завершено", handedOff: "Передано браузеру", failed: "Ошибка", cancelled: "Отменено",
@@ -1128,23 +1128,8 @@
         pumpDownloads();
       };
       try {
-        if (task.directory) {
-          // 已经指定目录：无需逐文件弹保存框。
-          enqueue(null);
-        } else if (
-          kind !== "image" &&
-          typeof page.showSaveFilePicker === "function" &&
-          page.self === page.top
-        ) {
-          // 文件选择框必须在原始点击栈内弹出，早于排队与请求。
-          Promise.resolve(page.showSaveFilePicker({ suggestedName: task.fileName })).then(
-            enqueue,
-            (error) => {
-              if (error.name === "AbortError") finishTask(task, "cancelled");
-              else finishTask(task, "failed", error);
-            }
-          );
-        } else enqueue(null);
+        // 一律不弹保存框：指定了目录就流式写盘，没指定就用 <a download> 落系统下载目录。
+        enqueue(null);
       } catch (error) {
         finishTask(task, "failed", error);
       }
@@ -1299,24 +1284,6 @@
     const ensureArchiveFolder = async (root, message, peerId) => {
       const dateFolder = await ensureChatDateFolder(root, peerId);
       return dateFolder.getDirectoryHandle(getGroupFolderName(message), { create: true });
-    };
-
-    // 首次使用且尚未设置目录时，在点击手势内直接弹出目录选择。
-    const pickArchiveRoot = () => {
-      try {
-        if (typeof page.showDirectoryPicker !== "function") return null;
-        return page
-          .showDirectoryPicker({ id: "tel-downloads", mode: "readwrite", startIn: "downloads" })
-          .then((handle) => {
-            directoryHandle = handle;
-            writeDirectoryHandle(handle).catch(() => {});
-            refreshFolderUi();
-            return handle;
-          })
-          .catch(() => null);
-      } catch {
-        return null;
-      }
     };
 
     // 整组下载：有目录 → 归档到按会话/日期/相册命名的子目录；无目录 → 原生串行。
@@ -1789,13 +1756,12 @@
           const group = collectGroupEntries(message, pending.peerId, pending.bubble);
           let rootPromise = null;
           let permission = null;
+          // 只有用户在面板里主动指定过目录才归档；否则交给 Telegram 原生通道，
+          // 直接落系统下载目录，不再弹出目录选择框。
           if (directoryHandle) {
             // 授权必须在点击手势内同步发起。
             permission = requestDirectoryPermission(directoryHandle);
             rootPromise = Promise.resolve(directoryHandle);
-          } else {
-            // 尚未设置目录：首次点击直接弹目录选择，后续自动复用。
-            rootPromise = pickArchiveRoot();
           }
           downloadGroup(group, {
             message,
@@ -1858,8 +1824,6 @@
       const label = button.querySelector(".tel-batch-text");
       // 目录授权必须在这个点击手势内发起，否则后续 await 之后弹不出授权框。
       const permission = requestDirectoryPermission(directoryHandle);
-      // 尚未设置目录时，首次点击批量按钮直接弹目录选择，后续复用。
-      const pickedRoot = directoryHandle ? null : pickArchiveRoot();
       let task = null;
       const restore = () => {
         batchBusy = false;
@@ -1894,7 +1858,8 @@
       // 一开跑就在面板里建聚合卡：按钮上的 n/N 太小容易看不见，面板才是主进度来源。
       task = createBatchTask(media.length, t("batchTitle"));
 
-      const batchRoot = directoryHandle || (pickedRoot ? await pickedRoot.catch(() => null) : null);
+      // 未指定目录时不再弹选择框：直接走原生通道，落系统下载目录。
+      const batchRoot = directoryHandle;
       if (batchRoot) {
         // 目录模式：按「会话/日期」归档，相册项各自进 album-<id> 子目录。
         // 单条仍走分片通道（有字节进度、各自建卡），聚合卡只负责 n/N 与取消。
@@ -2053,10 +2018,11 @@
       const folderLabel = panel.querySelector('label[for="tel-download-folder-button"]');
       if (folderLabel) folderLabel.textContent = t("folder");
       folderButton.disabled = typeof page.showDirectoryPicker !== "function";
+      // 未指定目录时显示「系统默认下载目录」：不选也能下，点击才是指定归档目录。
       folderButton.textContent = directoryHandle
         ? t("folderChosen", { name: directoryHandle.name })
-        : t("chooseFolder");
-      folderButton.title = folderButton.textContent;
+        : t("folderDefault");
+      folderButton.title = directoryHandle ? directoryHandle.name : t("chooseFolder");
       folderClear.hidden = !directoryHandle;
       folderClear.title = t("clearFolder");
       folderClear.setAttribute("aria-label", t("clearFolder"));
