@@ -20,13 +20,15 @@
 >
 > **同一功能的脚本只装一个。** Telegram 系只有一个脚本（#2 合并版）；旧版 `telegram-only` 已从仓库移除，若你此前装过，请先停用/删除旧版再装 #2，否则媒体查看器里会出现重复按钮。
 
-#### 1. Get Microsoft Rewards (修复/增强版) · v1.0.8
+#### 1. Get Microsoft Rewards (修复/增强版) · v1.1.0
 
 ```
 https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js
 ```
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js)
+
+<sub>微软 Rewards 自动助手：本地自动搜索（多热搜源轮换）、每日活动、自动签到、阅读任务，支持 PC / 移动端接口双通道。**浮动图标可拖拽**——位置写入 GM 存储后跨页面 / 跨站点（`www.bing.com` ↔ `rewards.bing.com`）记住，靠近屏幕边缘时展开会自动往内收，双击标题栏复位到右下角；展开后标题栏同样可拖，内容超长时面板内部滚动。</sub>
 
 #### 2. Telegram Media Downloader (Merged) · v1.2.0 · 推荐
 
@@ -44,7 +46,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 | 文件名 | 版本 | 说明 |
 | --- | --- | --- |
-| [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
+| [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.1.0 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到、阅读任务。多区域兼容与卡片过滤逻辑优化；**浮动图标可拖拽、位置记忆、边缘自动避让、双击标题栏复位**，展开后标题栏也可拖，内容超长时面板内部滚动。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
 | [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.2.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**旧 `telegram-only` 与 `Telegram-Media-Downloader-Pro` 的合并版**：WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先；**默认不弹目录选择框，文件直接落系统下载目录**（可选指定归档目录）、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单下载、选择栏批量下载（面板显示 `n/N` 条目进度与当前文件名、可取消）、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 严格限定 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。Telegram 下载脚本**只装这一个**。<br>显示名：`Telegram Media Downloader (Merged)` |
 
 ### 常见问题
@@ -103,6 +105,59 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 当前仓库内的脚本均不附带测试；若后续为某个脚本补上测试，统一放在 `userscripts/tests/`，用纯 Node 运行，
 被测脚本按 `import.meta.url` 相对定位，clone 到任意目录都能跑。
+
+### 关联脚本（上游，非本仓库维护）
+
+以下脚本来自第三方仓库，**不在本仓库内、也不由本仓库发版**。这里只做索引，方便装机时一次装齐；
+版本、更新与问题反馈均以上游为准，请遵守各自许可证。
+
+| 脚本 | 来源 / 许可 | 当前版本 | 功能 | 安装 | 备用直链 |
+| --- | --- | --- | --- | --- | --- |
+| Github 增强 · 高速下载 | [XIU2/UserScript](https://github.com/XIU2/UserScript)<br>GPL-3.0 | 2.6.41 | 高速下载 Git Clone/SSH、Release、Raw、Code(ZIP)（公益加速源），项目列表单文件快捷下载 | [GreasyFork 412245](https://greasyfork.org/zh-CN/scripts/412245) | [`GithubEnhanced-High-Speed-Download.user.js`](https://raw.githubusercontent.com/XIU2/UserScript/master/GithubEnhanced-High-Speed-Download.user.js) |
+| 知乎美化 | [XIU2/UserScript](https://github.com/XIU2/UserScript)<br>GPL-3.0 | 1.5.24 | 宽屏显示、暗黑模式（4 种，可跟随浏览器）、屏蔽首页活动广告、隐藏文章开头大图、调整图片最大高度、下翻自动隐藏顶栏 | [GreasyFork 412212](https://greasyfork.org/zh-CN/scripts/412212) | [`Zhihu-Beautification.user.js`](https://raw.githubusercontent.com/XIU2/UserScript/master/Zhihu-Beautification.user.js) |
+| 知乎增强 | [XIU2/UserScript](https://github.com/XIU2/UserScript)<br>GPL-3.0 | 2.3.32 | 移除登录弹窗、屏蔽指定类别 / 低赞低评 / 用户 / 关键词、默认收起回答、快捷收起与回到顶部、默认高清原图、站外直链等 | [GreasyFork 419081](https://greasyfork.org/zh-CN/scripts/419081) | [`Zhihu-Enhanced.user.js`](https://raw.githubusercontent.com/XIU2/UserScript/master/Zhihu-Enhanced.user.js) |
+| 抖音下载 | [zhzLuke96/douyin-dl-user-js](https://github.com/zhzLuke96/douyin-dl-user-js)<br>MIT | 1.5.15 | 无水印视频 / 图集 / 评论区图片 / 表情包 / 封面下载，视频帧截图，弹幕下载（ASS），下载历史与自定义文件名，作者主页批量下载（断点续传、并发、筛选、后台继续），可接 abdm / aria2 / IDM / BitComet 外部下载器 | [Release 直链](https://github.com/zhzLuke96/douyin-dl-user-js/releases/latest/download/dy-dl.user.js) | [GreasyFork 522326](https://greasyfork.org/zh-CN/scripts/522326) |
+| 更好的 X（BetterX） | [Iskongkongyo/BetterX](https://github.com/Iskongkongyo/BetterX)<br>MIT | 4.0.0<br><sub>源码已到 4.1.0，未发版</sub> | X（Twitter）增强：时间线帖子本地记录、全文搜索、收藏 / 置顶 / 备注、闪现帖标记；黄推与广告净化、媒体批量下载（ZIP、GIF）；通知订阅管理、宽屏与主页增强、四语界面 | [GreasyFork 588748](https://greasyfork.org/zh-CN/scripts/588748) | [Release v4.0.0](https://github.com/Iskongkongyo/BetterX/releases/download/v4.0.0/BetterX-v4.0.0.js) |
+| 网盘直链下载助手（FerryLink） | [Wjavan/FerryLink](https://github.com/Wjavan/FerryLink)<br>GPL-3.0 | 1.6.1 | 百度 / 阿里 / 天翼 / 迅雷 / 夸克 / 移动 / 城通网盘直链解析与批量取链，推送到 IDM / Aria2 / Motrix / BitComet / XDown，或复制 cURL、aria2c 命令；多链并发、主题与深色模式 | [GreasyFork 595544](https://greasyfork.org/zh-CN/scripts/595544) | [`网盘直链下载助手.user.js`](https://raw.githubusercontent.com/Wjavan/FerryLink/main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js) |
+
+<sub>版本号核对于 2026-11-04。XIU2 三份 GitHub raw 直链实测返回 200；抖音下载取最新 Release tag `v1.5.15`（2026-09-09 发布，仓库此后仍有提交但未发新版）；BetterX 取最新 Release `v4.0.0`（2026-10-24），但仓库 README 徽章与构建产物名已标到 4.1.0，尚无对应 tag；FerryLink 版本取自脚本 header（与最新 Release tag `v1.6.1` 一致），raw 直链实测 200 且与仓库内容 md5 相同。</sub>
+
+**通用须知**
+
+- **更新走上游**：升级由 GreasyFork / GitHub Release 推送。**不要把它们的 `@updateURL` / `@downloadURL` 改成本仓库地址** —— 本仓库不跟上游同步，改了等于静默断更。
+- **与本仓库脚本无冲突**：各自有独立 `@namespace` 与域名，可与上方 #1、#2 共存，安装顺序无所谓。
+- **同一脚本只装一份**：GreasyFork 版与 GitHub 版并存会出现重复按钮 / 重复面板。
+
+**XIU2 系（Github 增强 / 知乎美化 / 知乎增强）**
+
+- **知乎两个脚本是分层的**：美化只管样式（宽屏 / 暗黑 / 图片高度），增强只管功能（弹窗 / 屏蔽 / 快捷操作），**建议同装**，功能不重叠。
+- **备用源**：GitHub raw 被墙时可用 Bitbucket 镜像 `https://bitbucket.org/xiu2/userscript/raw/master/<文件名>`，两份内容一致（已验证字节数相同）。
+- **一个坑**：知乎增强 header 里的 `@namespace` 是 `https://greasyfork.org/scripts/4122051`（多一位，上游笔误）。它只作为脚本身份标识，不影响功能；但**不要**去「修正」它 —— 改了等于换身份，老用户的配置和更新链路都会断。
+
+**抖音下载（zhzLuke96）**
+
+- **装 Release 那份**：仓库根目录没有可直接安装的 `.user.js`，源码是 TypeScript 多模块 + esbuild 构建，安装产物 `dy-dl.user.js`（约 270 KB）只随 Release 发布，`@updateURL` 指向 `releases/latest/download/`，发新 tag 即自动升级。
+- **不要和 GreasyFork 版同装**：`dy-dl.user.js` 是同一个脚本的两份分发，且 Release 版随 tag 走、GreasyFork 版由作者单独同步，版本可能不一致。同装时按 `@namespace` 判定 —— 相同则互相覆盖（旧版配置被顶掉），不同则是两个脚本同时生效（悬浮按钮重叠）。**只留一份，优先 Release。**
+- **网络**：Release 资源走 `objects.githubusercontent.com`，部分网络环境下直连超时（本机实测 000）；打不开就退回 GreasyFork 522326 或走代理。
+- **能力边界**：批量下载不支持打包 zip，图集会逐项下载；图片转码 / 压缩仅在浏览器下载时生效，走外部下载器时不处理。
+
+**更好的 X（BetterX）**
+
+- **没有稳定直链**：Release 资源名带版本号（`BetterX-v4.0.0.js`），不存在 `releases/latest/download/<固定名>` 这种地址，所以表里给的是 v4.0.0 的**固定**资产地址。日常安装走 GreasyFork / OpenUserJS，升级由脚本自带 `@updateURL` 推送。
+- **源码不是单文件**：`src/*.part.js` 分片由 `scripts/build.mjs` 拼装，产物名形如 `更好的X（BetterX）v4.1.0.js`，仓库根目录没有可直接安装的文件。改代码需 `npm run check`（构建 + 约 30 个 node 测试），这点和本仓库「单文件 + 可选测试」的约定不同。
+- **上游 Release 命名不规范**：`v3.8.0` 里同时挂了 `BetterX-v3.7.0.js` 和 `BetterX-v3.8.0.js`，`v3.6.0` 挂的是 `.rar` 压缩包。手动下载时**认准资产名里的版本号**，别把旧版当新版装。
+- **运行时域名**：`x.com` / `m.x.com` / `twitter.com`，与本仓库现有脚本无交集；记录只存浏览器本地，不上传。
+- **管理器选择**：安卓 Firefox + Violentmonkey 取视频真实地址可能受登录态限制，抓视频建议换 Tampermonkey。
+
+**网盘直链下载助手（FerryLink）**
+
+- **文件名是中文，正好是本仓库约定的反面教材**：仓库根目录唯一脚本叫 `网盘直链下载助手.user.js`，raw 地址必须百分号编码才能访问（直接用中文字符的 URL 在本机实测返回 000）。这也解释了本仓库为什么强制 ASCII kebab-case。
+- **更新走 GreasyFork**：header 里 `@updateURL` / `@downloadURL` 都指向 `update.greasyfork.org/scripts/595544/...`，即使从仓库 raw 装的，升级也由 GreasyFork 分发。**Release 里没有 js 资产**（v1.6.1 只有 changelog），别去 Release 找文件。
+- **三个 `@require` 外部依赖**：jQuery 3.7.0 / sweetalert2 10.16.6 / js-md5 0.7.3，全部来自 `registry.npmmirror.com`。该源不通或被拦时脚本直接起不来（页面无反应，控制台会有 require 失败）。
+- **权限面偏大**：为适配任意下载器与直链域名，声明了 `@connect *`、`GM_cookie`、`GM_xmlhttpRequest`。功能上说得通，但意味着脚本能向任意域发请求、能读 Cookie，装前自己掂量。
+- **是二次开发，不是原创**：header 描述写明「基于油小猴(youxiaohou.com)的网盘直链下载助手修改」，GPL-3.0。
+- **能力边界**：只解析直链，**不突破限速**，上游自己建议配超级会员；百度超过 50 MB 的文件用浏览器直下会被 CDN 拒绝，得走下载器。
+- **备用分发**：ScriptCat 脚本页 8398（本机实测 200）；GreasyFork 页在本机网络下超时，不代表站点不可用。
 
 ---
 

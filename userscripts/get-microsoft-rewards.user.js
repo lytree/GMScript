@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Get Microsoft Rewards (修复/增强版)
 // @namespace    https://github.com/lytree/GMScript
-// @version      1.0.8
-// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。基于原脚本二次开发，在 Gemini AI 辅助下优化多区域兼容与卡片过滤逻辑。
+// @version      1.1.0
+// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。面板图标可拖拽、位置记忆、双击复位；多区域兼容与卡片过滤逻辑优化。
 // @author       lytree (二次开发); 原作者 Muverix / 基于 QingJ《Get Microsoft Rewards》
 // @license      MIT
 // @icon         https://rewards.bing.com/rewardscdn/images/rewards.png
@@ -24,6 +24,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_openInTab
 // @grant        GM_log
+// @grant        GM_info
 // @connect      bing.com
 // @connect      rewards.bing.com
 // @connect      www.bing.com
@@ -57,6 +58,9 @@
 (function () {
     'use strict';
 
+    // 版本号与脚本头保持一致，日志里不再写死
+    const SCRIPT_VERSION = (typeof GM_info !== 'undefined' && GM_info?.script?.version) || '1.1.0';
+
     // ========== 配置 ==========
     const CONFIG = {
         pc: { minDelay: 15000, maxDelay: 30000 },
@@ -84,20 +88,26 @@
 
     // ========== 状态 ==========
     let state = {
-        level: 1, points: 0,
+        level: 1, levelName: '', points: 0,
         readRunning: false,
         pcCur: 0, pcMax: 0,
         mobileCur: 0, mobileMax: 0,
         promosTotal: 0, promosDone: 0,
         signDone: false, signPoints: -1,
         readCur: 0, readMax: 0,
-        running: false,
-        busyCount: 0, // 👈 补上此初始化
+        running: false, allRunning: false,
+        busyCount: 0,
         accessToken: null,
         accessTokenExpiresAt: 0,
+        tokenPromise: null,
+        searchToken: null,
         updating: false,
         updatingPromise: null,
-        // 新增：搜索进度和暂停状态
+        checkedIn: false,
+        lastStatus: '',
+        country: '',
+        // 搜索进度和暂停状态
+        searchCur: 0, searchMax: 0,
         searchCount: 0,           // 当前搜索计数（用于暂停判断）
         isPaused: false,          // 是否处于暂停状态
         pauseEndTime: 0,          // 暂停结束时间戳
@@ -112,6 +122,9 @@
 
     // ========== 进度保存/恢复 ==========
     const STORAGE_KEY = 'mr_search_progress';
+    // 折叠图标位置（左上角坐标）。走 GM 存储而非 localStorage：bing.com 与 rewards.bing.com 是不同源，这样两边位置一致。
+    const PANEL_POS_KEY = 'mr_panel_pos';
+    const PANEL_GAP = 8;   // 面板与视口边缘的最小间距
 
     function saveProgress() {
         const today = getDateHyphen();
@@ -228,7 +241,7 @@
                             if (xhr.status >= 200 && xhr.status < 300) {
                                 resolve(options.returnUrl ? xhr.finalUrl : xhr.responseText);
                             } else if (xhr.status >= 300 && xhr.status < 400) {
-                                const loc = xhr.responseHeaders.match(/Location:\s*(.*?)\s*[\r\n]/i);
+                                const loc = (xhr.responseHeaders || '').match(/Location:\s*(.*?)\s*[\r\n]/i);
                                 resolve(loc ? loc[1] : xhr.responseText);
                             } else {
                                 const err = new Error(`HTTP ${xhr.status}`);
@@ -331,6 +344,10 @@
             border: 1px solid #e0e0e0;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             border-radius: 8px;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* 收起状态 */
@@ -338,7 +355,8 @@
             width: 44px;
             height: 44px;
             border-radius: 50%;
-            cursor: pointer;
+            cursor: grab;
+            touch-action: none;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -352,11 +370,36 @@
         #mr-panel.collapsed svg { width: 24px; height: 24px; fill: currentColor; }
         #mr-panel.collapsed #mr-container { display: none; }
 
+        /* 拖拽中：禁用过渡与 hover 缩放，否则位置会跟手不同步 */
+        #mr-panel.dragging,
+        #mr-panel.dragging:hover {
+            transition: none !important;
+            transform: none !important;
+            cursor: grabbing !important;
+            box-shadow: 0 10px 28px rgba(0,120,212,0.45) !important;
+        }
+
         /* 展开状态 */
-        #mr-panel:not(.collapsed) { width: 300px; }
+        #mr-panel:not(.collapsed) {
+            width: 300px;
+            max-height: calc(100vh - 16px);
+            display: flex;
+            flex-direction: column;
+        }
         #mr-panel:not(.collapsed) svg { display: none; }
+        #mr-panel:not(.collapsed) #mr-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+        #mr-panel:not(.collapsed) #mr-body {
+            min-height: 0;
+            overflow-y: auto;
+        }
 
         #mr-header {
+            flex-shrink: 0;
             padding: 12px 16px;
             border-bottom: 1px solid #eee;
             display: flex;
@@ -364,6 +407,8 @@
             align-items: center;
             background: #f8f9fa;
             border-radius: 8px 8px 0 0;
+            cursor: move;
+            touch-action: none;
         }
         #mr-title { font-weight: 600; font-size: 14px; color: #333; }
         #mr-close { cursor: pointer; color: #999; font-size: 18px; line-height: 1; }
@@ -496,26 +541,224 @@
 
     // ========== 交互逻辑 ==========
 
-    // 展开/收起
-    nodes.panel.onclick = (e) => {
-        if (nodes.panel.classList.contains('collapsed')) {
-            nodes.panel.classList.remove('collapsed');
-        }
+    // ---------- 面板定位 / 拖拽 ----------
+    // 折叠图标可拖：位置写入 GM 存储，换页/换站点（www.bing.com ↔ rewards.bing.com）都记住。
+    // 展开时以图标为锚点自动避让视口边缘；标题栏也可拖，双击标题栏复位。
+    const headerEl = $('#mr-header');
+    const DRAG_THRESHOLD = 4;
+
+    let iconPos = null;     // 折叠图标左上角（持久化目标）
+    let iconDrag = null;    // 图标拖拽会话
+    let headerDrag = null;  // 标题栏拖拽会话
+    let swallowClick = false;   // 拖拽松手后浏览器会补一个 click，不能当成"展开"
+
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), Math.max(min, max));
+    const panelSize = () => ({
+        w: nodes.panel.offsetWidth || 46,
+        h: nodes.panel.offsetHeight || 46
+    });
+    // 用 offsetLeft/offsetTop 而不是 getBoundingClientRect：折叠图标的 hover 缩放会污染 rect，
+    // 而 offset* 是纯布局值，跟手不会偏。
+    const panelOrigin = () => ({ left: nodes.panel.offsetLeft, top: nodes.panel.offsetTop });
+
+    function readIconPos() {
+        try {
+            const raw = GM_getValue(PANEL_POS_KEY, '');
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (Number.isFinite(data?.left) && Number.isFinite(data?.top)) {
+                return { left: data.left, top: data.top };
+            }
+        } catch (e) { }
+        return null;
+    }
+
+    function saveIconPos(left, top) {
+        iconPos = { left: Math.round(left), top: Math.round(top) };
+        try { GM_setValue(PANEL_POS_KEY, JSON.stringify(iconPos)); } catch (e) { }
+    }
+
+    function placePanel(left, top) {
+        nodes.panel.style.left = `${Math.round(left)}px`;
+        nodes.panel.style.top = `${Math.round(top)}px`;
+        nodes.panel.style.right = 'auto';
+        nodes.panel.style.bottom = 'auto';
+    }
+
+    function clearPanelPlacement() {
+        nodes.panel.style.left = '';
+        nodes.panel.style.top = '';
+        nodes.panel.style.right = '';
+        nodes.panel.style.bottom = '';
+    }
+
+    function expandPanel() {
+        if (!nodes.panel.classList.contains('collapsed')) return;
+        const anchor = panelOrigin();
+        nodes.panel.classList.remove('collapsed');
+
+        // 展开后尺寸变大，靠近右/下边缘时整体往里收，保证不溢出视口
+        const size = panelSize();
+        placePanel(
+            clamp(Math.min(anchor.left, window.innerWidth - size.w - PANEL_GAP), PANEL_GAP, window.innerWidth - size.w - PANEL_GAP),
+            clamp(Math.min(anchor.top, window.innerHeight - size.h - PANEL_GAP), PANEL_GAP, window.innerHeight - size.h - PANEL_GAP)
+        );
+    }
+
+    function collapsePanel() {
+        if (nodes.panel.classList.contains('collapsed')) return;
+        nodes.panel.classList.add('collapsed');
+        if (iconPos) placePanel(iconPos.left, iconPos.top);
+        else clearPanelPlacement();   // 从未拖过 → 回到 CSS 默认的右下角
+    }
+
+    function resetPanelPosition() {
+        iconPos = null;
+        iconDrag = null;
+        headerDrag = null;
+        try { GM_setValue(PANEL_POS_KEY, ''); } catch (e) { }
+        nodes.panel.classList.remove('dragging');
+        clearPanelPlacement();
+        log('📍 面板位置已复位');
+    }
+
+    // 展开 / 收起
+    nodes.panel.onclick = () => {
+        if (swallowClick) { swallowClick = false; return; }   // 只吞掉拖拽收尾那一次
+        expandPanel();
     };
     nodes.close.onclick = (e) => {
         e.stopPropagation();
-        nodes.panel.classList.add('collapsed');
+        collapsePanel();
     };
+
+    const isInteractive = (target) =>
+        target instanceof Element && !!target.closest('button, input, #mr-close');
+
+    function beginDrag(event, source) {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        const collapsed = nodes.panel.classList.contains('collapsed');
+        if (source === 'icon' ? !collapsed : collapsed) return;
+        if (source === 'header' && isInteractive(event.target)) return;
+
+        if (source === 'icon') nodes.panel.classList.add('dragging');   // 去掉 hover 缩放，拖动时视觉更稳
+        const origin = panelOrigin();
+        const size = panelSize();
+        const host = source === 'icon' ? nodes.panel : headerEl;
+
+        const session = {
+            id: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            originLeft: origin.left,
+            originTop: origin.top,
+            w: size.w,
+            h: size.h,
+            moved: false
+        };
+        if (source === 'icon') iconDrag = session;
+        else headerDrag = session;
+
+        try { host.setPointerCapture(event.pointerId); } catch (e) { }
+    }
+
+    function moveDrag(event, session) {
+        if (!session || event.pointerId !== session.id) return;
+        const dx = event.clientX - session.startX;
+        const dy = event.clientY - session.startY;
+
+        if (!session.moved) {
+            if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;   // 抖动阈值，避免点击被判成拖动
+            session.moved = true;
+        }
+        event.preventDefault();
+
+        placePanel(
+            clamp(session.originLeft + dx, 0, window.innerWidth - session.w),
+            clamp(session.originTop + dy, 0, window.innerHeight - session.h)
+        );
+    }
+
+    function endDrag(event, source) {
+        const session = source === 'icon' ? iconDrag : headerDrag;
+        if (!session || event.pointerId !== session.id) return;
+        const host = source === 'icon' ? nodes.panel : headerEl;
+        try { host.releasePointerCapture(event.pointerId); } catch (e) { }
+
+        if (session.moved) {
+            const origin = panelOrigin();
+            // 折叠态记图标坐标；拖动标题栏后把面板左上角作为新的图标锚点
+            saveIconPos(origin.left, origin.top);
+            swallowClick = true;
+            setTimeout(() => { swallowClick = false; }, 300);   // 兜底，避免标志卡住
+        }
+
+        if (source === 'icon') {
+            iconDrag = null;
+            nodes.panel.classList.remove('dragging');
+        } else {
+            headerDrag = null;
+        }
+    }
+
+    nodes.panel.addEventListener('pointerdown', (e) => {
+        if (nodes.panel.classList.contains('collapsed')) beginDrag(e, 'icon');
+    });
+    nodes.panel.addEventListener('pointermove', (e) => moveDrag(e, iconDrag));
+    nodes.panel.addEventListener('pointerup', (e) => endDrag(e, 'icon'));
+    nodes.panel.addEventListener('pointercancel', (e) => endDrag(e, 'icon'));
+
+    headerEl.addEventListener('pointerdown', (e) => beginDrag(e, 'header'));
+    headerEl.addEventListener('pointermove', (e) => moveDrag(e, headerDrag));
+    headerEl.addEventListener('pointerup', (e) => endDrag(e, 'header'));
+    headerEl.addEventListener('pointercancel', (e) => endDrag(e, 'header'));
+    headerEl.addEventListener('dblclick', (e) => {
+        if (isInteractive(e.target)) return;
+        resetPanelPosition();
+    });
+    headerEl.title = '按住拖动 · 双击复位';
+
+    window.addEventListener('resize', () => {
+        if (!nodes.panel.style.left) return;
+        const size = panelSize();
+        const left = clamp(nodes.panel.offsetLeft, 0, window.innerWidth - size.w);
+        const top = clamp(nodes.panel.offsetTop, 0, window.innerHeight - size.h);
+        placePanel(left, top);
+        if (nodes.panel.classList.contains('collapsed')) saveIconPos(left, top);
+    });
+
+    // 启动时恢复上次的图标位置（换显示器后可能超出视口，先夹回来）
+    iconPos = readIconPos();
+    if (iconPos) {
+        const size = panelSize();
+        placePanel(
+            clamp(iconPos.left, 0, window.innerWidth - size.w),
+            clamp(iconPos.top, 0, window.innerHeight - size.h)
+        );
+    }
+
+    if (typeof GM_registerMenuCommand === 'function') {
+        GM_registerMenuCommand('🎁 展开 / 收起面板', () => {
+            if (nodes.panel.classList.contains('collapsed')) expandPanel();
+            else collapsePanel();
+        });
+        GM_registerMenuCommand('📍 复位面板位置', resetPanelPosition);
+    }
 
     const LOG_MAX_LINES = 200;
     const log = (msg) => {
+        const box = nodes.logBox;
+        if (!box) { console.log('[Rewards]', msg); return; }
+        // 用户正向上翻看历史日志时不要强行拉到底部
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+
         const div = document.createElement('div');
         div.textContent = `[${new Date().toLocaleTimeString().slice(0, 5)}] ${msg}`;
-        nodes.logBox.appendChild(div);
-        while (nodes.logBox.childNodes.length > LOG_MAX_LINES) {
-            nodes.logBox.removeChild(nodes.logBox.firstChild);
+        box.appendChild(div);
+        while (box.childNodes.length > LOG_MAX_LINES) {
+            box.removeChild(box.firstChild);
         }
-        nodes.logBox.scrollTop = nodes.logBox.scrollHeight;
+        if (atBottom) box.scrollTop = box.scrollHeight;
     };
 
     const updateAllButton = () => {
@@ -1807,9 +2050,16 @@ nodes.btnRead.onclick = runRead;
             log('⚠️ 当前时间 00:00-08:00，Rewards 每日任务可能尚未刷新');
             log('💡 建议北京时间 08:00 后运行脚本，避免任务进度显示异常');
         }
-        log('🌟 脚本就绪 v1.0.6');
+        log('🌟 脚本就绪 v' + SCRIPT_VERSION);
     })();
 
-    setInterval(updateData, 60000);
+    setInterval(() => {
+        if (document.hidden) return;   // 后台标签页不刷新，省请求也少触发风控
+        updateData();
+    }, 60000);
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) updateData();
+    });
 
 })();
