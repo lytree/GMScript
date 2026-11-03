@@ -38,16 +38,6 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 <sub>由三份上游实现（Nestor Qin / yoshiko.wisoky / copyMister）与旧 `telegram-only` 变体合并而成的单一实现：受限频道下载、WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单与选择栏批量下载、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n；不含任何推广 / 邀请 / 统计外链。**注意：这是新的脚本身份**，旧版 `telegram-only`（v1.0.7）已下线，请先停用/卸载旧版再装本脚本，否则媒体查看器会出现重复按钮。</sub>
 
-#### 3. WPS Auto Sign-in (自动签到) · v1.0.0
-
-```
-https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-signin.user.js
-```
-
-👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-signin.user.js)
-
-<sub>登录 WPS 后自动运行，零配置：每日签到（会员 + 积分）、福利中心打卡领会员、天天抽奖。调用的是 WPS 官方公开接口，频率已做限制，风险自负。</sub>
-
 <sub>以上地址同时是 `@downloadURL` 与 `@updateURL`。脚本管理器会按此地址定期检查版本，**升级无需重新安装**。</sub>
 
 ### 脚本列表
@@ -56,7 +46,6 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-sign
 | --- | --- | --- |
 | [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.0.8 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到。多区域兼容与卡片过滤逻辑优化。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
 | [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.2.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**旧 `telegram-only` 与 `Telegram-Media-Downloader-Pro` 的合并版**：WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先；**默认不弹目录选择框，文件直接落系统下载目录**（可选指定归档目录）、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单下载、选择栏批量下载（面板显示 `n/N` 条目进度与当前文件名、可取消）、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 严格限定 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。Telegram 下载脚本**只装这一个**。<br>显示名：`Telegram Media Downloader (Merged)` |
-| [`wps-auto-signin.user.js`](userscripts/wps-auto-signin.user.js) | 1.0.0 | WPS 自动签到助手：每日签到（领会员 + 积分）、福利中心打卡领会员、天天抽奖。登录 WPS 后自动运行，零配置；带本地单元 / 端到端测试。<br>显示名：`WPS Auto Sign-in (自动签到)` |
 
 ### 常见问题
 
@@ -71,6 +60,10 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-sign
 
 **我改了 `@name`，为什么老用户变成两个脚本？**
 `@name` + `@namespace` 共同构成 Tampermonkey 的脚本身份。发布后改动这两项会被视为新脚本，老用户既收不到更新、又会重复安装。
+
+> ⚠️ **2026-11 下线 WPS 脚本**：`wps-auto-signin.user.js`（WPS Auto Sign-in 自动签到，v1.0.0）已从仓库移除，
+> 连同 `userscripts/tests/` 下的两份测试。该脚本的 raw 地址现已 404，**不会再收到自动更新**。
+> 装过的用户请在脚本管理器里直接停用 / 卸载；仓库不再维护此功能。
 
 > ⚠️ **2026-10 结构变更**：原有脚本从仓库根目录移入了 `userscripts/` 子目录，raw 地址随之改变。
 > 脚本内的 `@updateURL` / `@downloadURL` 已同步改为新地址，**但你本机已安装的副本仍指向旧地址**。
@@ -108,14 +101,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/wps-auto-sign
 
 ### 本地测试
 
-带测试的脚本放在 [`userscripts/tests/`](userscripts/tests/)，纯 Node 运行，不需要浏览器：
-
-```bash
-node userscripts/tests/wps-auto-signin.unit.mjs   # 27 项：base64 / RSA / AES / classify / header 自检
-node userscripts/tests/wps-auto-signin.e2e.mjs    # 23 项：真实抓包响应驱动任务函数，覆盖全部业务分支
-```
-
-测试从 `.user.js` 源码里**抽取真实函数体**执行（不是手抄副本），脚本一改测试立刻反映；
+当前仓库内的脚本均不附带测试；若后续为某个脚本补上测试，统一放在 `userscripts/tests/`，用纯 Node 运行，
 被测脚本按 `import.meta.url` 相对定位，clone 到任意目录都能跑。
 
 ---
