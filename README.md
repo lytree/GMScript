@@ -63,21 +63,19 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 **我改了 `@name`，为什么老用户变成两个脚本？**
 `@name` + `@namespace` 共同构成 Tampermonkey 的脚本身份。发布后改动这两项会被视为新脚本，老用户既收不到更新、又会重复安装。
 
-> ⚠️ **2026-11 下线 WPS 脚本**：`wps-auto-signin.user.js`（WPS Auto Sign-in 自动签到，v1.0.0）已从仓库移除，
-> 连同 `userscripts/tests/` 下的两份测试。该脚本的 raw 地址现已 404，**不会再收到自动更新**。
-> 装过的用户请在脚本管理器里直接停用 / 卸载；仓库不再维护此功能。
+**升级后遇到 404、或冒出重复按钮 / 面板？**
+先看下一节的**变更记录** —— 历史上几次改动都要求老用户手动重装或卸载一次。
 
-> ⚠️ **2026-10 结构变更**：原有脚本从仓库根目录移入了 `userscripts/` 子目录，raw 地址随之改变。
-> 脚本内的 `@updateURL` / `@downloadURL` 已同步改为新地址，**但你本机已安装的副本仍指向旧地址**。
-> 老用户需从上方新地址**重新安装一次**，之后即可恢复自动更新。旧地址（根目录）已失效，会返回 404。
->
-> 同一时间，旧版 `telegram-media-downloader.telegram-only.user.js` **已从仓库删除**（功能并入合并版），
-> 已安装该旧版的用户请先卸载旧版，再安装上面的合并版。
+### 变更记录
 
-> ⚠️ **2026-10 TDL 合并**：`telegram-media-downloader.telegram-only.user.js`（v1.0.7）已从仓库移除，
-> 由合并版 `telegram-media-downloader-merged.user.js`（v1.2.0，显示名 `Telegram Media Downloader (Merged)`）取代。
-> 两者 `@name` / `@namespace` 不同，脚本管理器视为两个独立脚本 —— **必须先卸载旧版**，再装新版，
-> 否则两个面板会同时出现。旧地址现已 404，装过旧版的用户不会收到自动更新，需手动迁移一次。
+只收录**会影响已安装用户**的变更：下线、改名、目录迁移、脚本身份变化。
+普通 `@version` 递增不在其中，版本演进看各脚本 header 或提交历史。
+
+| 日期 | 变更 | 对已装用户的影响 |
+| --- | --- | --- |
+| 2026-11 | 下线 `wps-auto-signin.user.js`（WPS Auto Sign-in 自动签到 v1.0.0），连同 `userscripts/tests/` 下两份测试 | raw 地址现已 404，**不再收到自动更新**；需在脚本管理器里手动停用 / 卸载。仓库不再维护该功能 |
+| 2026-10 | 脚本从仓库根目录移入 `userscripts/`，raw 地址随之改变（脚本内 `@updateURL` / `@downloadURL` 已同步） | 本机已装副本仍指向旧地址 → **重新安装一次**即可恢复自动更新；根目录旧地址已失效 |
+| 2026-10 | 删除 `telegram-media-downloader.telegram-only.user.js`（v1.0.7），功能并入 `telegram-media-downloader-merged.user.js`（v1.2.0） | 两者 `@name` / `@namespace` 不同，管理器视为两个脚本 → **必须先卸载旧版**再装合并版，否则媒体查看器出现两个下载按钮；旧地址已 404，不会自动更新 |
 
 ### 命名与更新约定
 
@@ -86,13 +84,14 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 3. **`@downloadURL` 与 `@updateURL` 指向同一个 `.user.js`**（不使用独立的 `.meta.js`），维护成本最低。
 4. **`@name` + `@namespace` 一旦发布不再改动**，理由见上方常见问题。
 5. **脚本显示名可以保留中文**（如 `@name:zh-CN`），它与文件名各自独立，互不影响。
-6. **移动 / 重命名文件必须同步改 `@updateURL` 与 `@downloadURL`**，并预先告知用户重新安装 —— 否则自动更新链路会静默断掉。
+6. **移动 / 重命名文件必须同步改 `@updateURL` 与 `@downloadURL`**，并预先告知用户重新安装 —— 否则自动更新链路会静默断掉。这类变更同时登记到上方[「变更记录」](#变更记录)。
 
 ### 发布流程
 
 1. 修改 `userscripts/*.user.js`，递增 `@version`。
 2. `git add -A && git commit -m "..." && git push`（或直接在 GitHub 网页上传覆盖同名文件）。
-3. **推送后校验 raw 地址返回 200**，确认更新链路通顺：
+3. 若本次改动会**影响已安装用户**（下线、改名、移动文件、改 `@namespace`），在「变更记录」补一行 —— 写清用户**要做什么**，而不只是改了哪些代码。
+4. **推送后校验 raw 地址返回 200**，确认更新链路通顺：
 
    ```bash
    curl -sI https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js | head -1
