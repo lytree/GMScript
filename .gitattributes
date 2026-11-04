@@ -1,0 +1,9 @@
+# 镜像文件必须与上游逐字节一致 —— manifest.json 里存的是 sha256。
+# 在 core.autocrlf=true 的机器上，若允许换行符转换，checkout 会把文件写成 CRLF，
+# `node third-party/sync.mjs --check` 就会把"换行符被改过"误报成"上游发新版"。
+third-party/userscripts/*.user.js -text
+
+# 镜像的元数据与工具脚本保持 LF，跨平台 diff 才不会有噪音。
+third-party/*.json text eol=lf
+third-party/*.mjs text eol=lf
+third-party/*.md text eol=lf
