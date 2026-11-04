@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | [`userscripts/`](userscripts/) | Tampermonkey / Violentmonkey 油猴脚本 | 浏览器 |
 | [`win-scripts/`](win-scripts/) | Windows 环境搭建 / 配置脚本（PowerShell、batch） | 命令行 |
+| [`third-party/`](third-party/) | 上游脚本的只读镜像（不入库发布，见[说明](third-party/README.md)） | 参考 / 复核 |
 
 ---
 
@@ -121,6 +122,8 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 <sub>版本号核对于 2026-11-04。XIU2 三份 GitHub raw 直链实测返回 200；抖音下载取最新 Release tag `v1.5.15`（2026-09-09 发布，仓库此后仍有提交但未发新版）；BetterX 取最新 Release `v4.0.0`（2026-10-24），但仓库 README 徽章与构建产物名已标到 4.1.0，尚无对应 tag；FerryLink 版本取自脚本 header（与最新 Release tag `v1.6.1` 一致），raw 直链实测 200 且与仓库内容 md5 相同。</sub>
 
+<sub>**本地镜像**：以上 6 个脚本各存了一份原样副本在 [`third-party/userscripts/`](third-party/userscripts/)，带 sha256 与同步脚本（`node third-party/sync.mjs`）。镜像只用于阅读与复核 —— **不要从镜像安装，也不要把它当 `@updateURL`**，安装用上表地址。</sub>
+
 **通用须知**
 
 - **更新走上游**：升级由 GreasyFork / GitHub Release 推送。**不要把它们的 `@updateURL` / `@downloadURL` 改成本仓库地址** —— 本仓库不跟上游同步，改了等于静默断更。
@@ -135,14 +138,14 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 **抖音下载（zhzLuke96）**
 
-- **装 Release 那份**：仓库根目录没有可直接安装的 `.user.js`，源码是 TypeScript 多模块 + esbuild 构建，安装产物 `dy-dl.user.js`（约 270 KB）只随 Release 发布，`@updateURL` 指向 `releases/latest/download/`，发新 tag 即自动升级。
+- **装 Release 那份**：仓库根目录没有可直接安装的 `.user.js`，源码是 TypeScript 多模块 + esbuild 构建，安装产物 `dy-dl.user.js`（约 270 KB）只随 Release 发布，`@updateURL` 指向 `releases/latest/download/`，发新 tag 即自动升级。`@namespace` 是 `https://github.com/zhzLuke96/douyin-dl-user-js`（镜像内核对）。
 - **不要和 GreasyFork 版同装**：`dy-dl.user.js` 是同一个脚本的两份分发，且 Release 版随 tag 走、GreasyFork 版由作者单独同步，版本可能不一致。同装时按 `@namespace` 判定 —— 相同则互相覆盖（旧版配置被顶掉），不同则是两个脚本同时生效（悬浮按钮重叠）。**只留一份，优先 Release。**
 - **网络**：Release 资源走 `objects.githubusercontent.com`，部分网络环境下直连超时（本机实测 000）；打不开就退回 GreasyFork 522326 或走代理。
 - **能力边界**：批量下载不支持打包 zip，图集会逐项下载；图片转码 / 压缩仅在浏览器下载时生效，走外部下载器时不处理。
 
 **更好的 X（BetterX）**
 
-- **没有稳定直链**：Release 资源名带版本号（`BetterX-v4.0.0.js`），不存在 `releases/latest/download/<固定名>` 这种地址，所以表里给的是 v4.0.0 的**固定**资产地址。日常安装走 GreasyFork / OpenUserJS，升级由脚本自带 `@updateURL` 推送。
+- **没有稳定直链**：Release 资源名带版本号（`BetterX-v4.0.0.js`），不存在 `releases/latest/download/<固定名>` 这种地址，所以表里给的是 v4.0.0 的**固定**资产地址。日常安装走 GreasyFork / OpenUserJS。产物头部的 `@downloadURL` 也指向 `update.greasyfork.org/scripts/588748/…`（镜像内核对），所以即便装了 Release 资产，后续升级同样由 GreasyFork 发版。
 - **源码不是单文件**：`src/*.part.js` 分片由 `scripts/build.mjs` 拼装，产物名形如 `更好的X（BetterX）v4.1.0.js`，仓库根目录没有可直接安装的文件。改代码需 `npm run check`（构建 + 约 30 个 node 测试），这点和本仓库「单文件 + 可选测试」的约定不同。
 - **上游 Release 命名不规范**：`v3.8.0` 里同时挂了 `BetterX-v3.7.0.js` 和 `BetterX-v3.8.0.js`，`v3.6.0` 挂的是 `.rar` 压缩包。手动下载时**认准资产名里的版本号**，别把旧版当新版装。
 - **运行时域名**：`x.com` / `m.x.com` / `twitter.com`，与本仓库现有脚本无交集；记录只存浏览器本地，不上传。
