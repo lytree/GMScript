@@ -122,7 +122,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 <sub>版本号核对于 2026-11-04。XIU2 三份 GitHub raw 直链实测返回 200；抖音下载取最新 Release tag `v1.5.15`（2026-09-09 发布，仓库此后仍有提交但未发新版）；BetterX 取最新 Release `v4.0.0`（2026-10-24），但仓库 README 徽章与构建产物名已标到 4.1.0，尚无对应 tag；FerryLink 版本取自脚本 header（与最新 Release tag `v1.6.1` 一致），raw 直链实测 200 且与仓库内容 md5 相同。</sub>
 
-<sub>**本地镜像**：以上 6 个脚本各存了一份原样副本在 [`third-party/userscripts/`](third-party/userscripts/)，带 sha256 与同步脚本（`node third-party/sync.mjs`）。镜像只用于阅读与复核 —— **不要从镜像安装，也不要把它当 `@updateURL`**，安装用上表地址。</sub>
+<sub>**本地镜像**：以上 6 个脚本各存了一份原样副本在 [`third-party/userscripts/`](third-party/userscripts/)，每个副本都记了来源仓库、ref、**对应的上游 commit**、sha256 与同步时间（见 [`third-party/SOURCES.md`](third-party/SOURCES.md)），后期核对「镜像落后多少」有据可查。同步工具：`node third-party/sync.mjs`。镜像只用于阅读与复核 —— **不要从镜像安装，也不要把它当 `@updateURL`**，安装用上表地址。</sub>
 
 **通用须知**
 

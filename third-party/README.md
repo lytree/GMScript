@@ -36,9 +36,35 @@ node third-party/sync.mjs --check
 node third-party/sync.mjs --only=betterx --only=douyin-dl
 ```
 
-纯 Node 18+，无第三方依赖。下载顺序是 `url` → `alternates`：Release 资产的真实域名是 `objects.githubusercontent.com`，部分网络直连不通，所以清单里给了 `gh-proxy.com` 镜像，靠大小与 `@version` 兜底比对，不会悄悄换掉内容。
+纯 Node 18+，无第三方依赖。下载顺序是 `url` → `alternates`，网络错误会重试一次（HTTP 4xx 是确定性失败，不重试）：Release 资产的真实域名是 `objects.githubusercontent.com`，部分网络直连不通，所以清单里给了 `gh-proxy.com` 镜像；raw 偶尔抽风时退回 Bitbucket / jsDelivr。镜像可能比主干慢一拍，所以**判断版本一律以 sha256 与 `@version` 为准，不以镜像的 lag 为准**。
 
-**信任模型**：首次同步时记下的 `sha256` 是后续比对的锚点。上游正常发版时哈希必然变化，`--check` 会如实报"有更新"；如果版本号没动而哈希变了，那值得停下来看一眼 —— 那意味着对方重写了同版本的文件。
+**信任模型**：首次同步时记下的 `sha256` 是后续比对的锚点。上游正常发版时哈希必然变化，`--check` 会如实报「有更新」；如果版本号没动而哈希变了，那值得停下来看一眼 —— 那意味着对方重写了同版本的文件。
+
+## 来源记录
+
+`@version` 只说明「第几版」，说明不了「对应上游哪一次改动」。所以每个条目除了版本，还记了 commit：
+
+[`SOURCES.md`](SOURCES.md)（每次同步自动重写，别手工改）给出人能读的对照表：
+
+```
+node third-party/sync.mjs --report    # 同一张表打到 stdout
+```
+
+`manifest.json` 里每条记录的 `source` 字段是机器可读的那份：
+
+| 字段 | 含义 |
+| --- | --- |
+| `refType` / `ref` | 取自分支（`master` / `main`，会移动）还是某个 Release tag（不会变） |
+| `commit` | 该文件在上游当前对应的提交 sha —— 后期 diff、bisect、看「某行为哪来的」全靠它 |
+| `committedAt` | 该提交的日期 |
+| `resolvedUrl` | **实际**命中的下载地址（可能是备用镜像），出问题时先看这里 |
+| `fetchedAt` | 该文件内容最后一次与上游对齐的时间 |
+
+## 后期更新的标准动作
+
+1. `node third-party/sync.mjs --check` —— 看谁动了。版本号变了会显示 `旧 → 新`；文件没变但上游有新提交会标「上游有新提交，本文件未变」，那可忽略。
+2. `node third-party/sync.mjs` —— 真正拉取，`manifest.json` 与 `SOURCES.md` 一起刷新。
+3. 回头校准根 README：版本号、以及那些「取决于实现」的判断（`@namespace` 是啥、`@updateURL` 指向哪、有没有外部依赖、权限面多大）。这些会随上游重写而失效，镜像就是用来复核它们的。
 
 ## 更新镜像的节奏
 
