@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Get Microsoft Rewards (修复/增强版)
 // @namespace    https://github.com/lytree/GMScript
-// @version      1.1.0
-// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。面板图标可拖拽、位置记忆、双击复位；多区域兼容与卡片过滤逻辑优化。
+// @version      1.1.1
+// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。面板图标可拖拽（不记住位置，刷新回右下角）、双击复位；多区域兼容与卡片过滤逻辑优化。
 // @author       lytree (二次开发); 原作者 Muverix / 基于 QingJ《Get Microsoft Rewards》
 // @license      MIT
 // @icon         https://rewards.bing.com/rewardscdn/images/rewards.png
@@ -122,7 +122,7 @@
 
     // ========== 进度保存/恢复 ==========
     const STORAGE_KEY = 'mr_search_progress';
-    // 折叠图标位置（左上角坐标）。走 GM 存储而非 localStorage：bing.com 与 rewards.bing.com 是不同源，这样两边位置一致。
+    // 旧版本把折叠图标坐标存在这里；现已改为不持久化，仅用于启动时清理残留
     const PANEL_POS_KEY = 'mr_panel_pos';
     const PANEL_GAP = 8;   // 面板与视口边缘的最小间距
 
@@ -542,12 +542,12 @@
     // ========== 交互逻辑 ==========
 
     // ---------- 面板定位 / 拖拽 ----------
-    // 折叠图标可拖：位置写入 GM 存储，换页/换站点（www.bing.com ↔ rewards.bing.com）都记住。
+    // 折叠图标可拖，但位置只在当前页面会话内有效：刷新 / 换页后回到默认的右下角，不做持久化。
     // 展开时以图标为锚点自动避让视口边缘；标题栏也可拖，双击标题栏复位。
     const headerEl = $('#mr-header');
     const DRAG_THRESHOLD = 4;
 
-    let iconPos = null;     // 折叠图标左上角（持久化目标）
+    let iconPos = null;     // 本次页面会话内的折叠图标左上角（仅内存）
     let iconDrag = null;    // 图标拖拽会话
     let headerDrag = null;  // 标题栏拖拽会话
     let swallowClick = false;   // 拖拽松手后浏览器会补一个 click，不能当成"展开"
@@ -561,21 +561,8 @@
     // 而 offset* 是纯布局值，跟手不会偏。
     const panelOrigin = () => ({ left: nodes.panel.offsetLeft, top: nodes.panel.offsetTop });
 
-    function readIconPos() {
-        try {
-            const raw = GM_getValue(PANEL_POS_KEY, '');
-            if (!raw) return null;
-            const data = JSON.parse(raw);
-            if (Number.isFinite(data?.left) && Number.isFinite(data?.top)) {
-                return { left: data.left, top: data.top };
-            }
-        } catch (e) { }
-        return null;
-    }
-
-    function saveIconPos(left, top) {
+    function setIconPos(left, top) {
         iconPos = { left: Math.round(left), top: Math.round(top) };
-        try { GM_setValue(PANEL_POS_KEY, JSON.stringify(iconPos)); } catch (e) { }
     }
 
     function placePanel(left, top) {
@@ -616,7 +603,6 @@
         iconPos = null;
         iconDrag = null;
         headerDrag = null;
-        try { GM_setValue(PANEL_POS_KEY, ''); } catch (e) { }
         nodes.panel.classList.remove('dragging');
         clearPanelPlacement();
         log('📍 面板位置已复位');
@@ -687,8 +673,8 @@
 
         if (session.moved) {
             const origin = panelOrigin();
-            // 折叠态记图标坐标；拖动标题栏后把面板左上角作为新的图标锚点
-            saveIconPos(origin.left, origin.top);
+            // 折叠态记图标坐标；拖动标题栏后把面板左上角作为新的图标锚点（仅当前会话）
+            setIconPos(origin.left, origin.top);
             swallowClick = true;
             setTimeout(() => { swallowClick = false; }, 300);   // 兜底，避免标志卡住
         }
@@ -724,18 +710,14 @@
         const left = clamp(nodes.panel.offsetLeft, 0, window.innerWidth - size.w);
         const top = clamp(nodes.panel.offsetTop, 0, window.innerHeight - size.h);
         placePanel(left, top);
-        if (nodes.panel.classList.contains('collapsed')) saveIconPos(left, top);
+        if (nodes.panel.classList.contains('collapsed')) setIconPos(left, top);
     });
 
-    // 启动时恢复上次的图标位置（换显示器后可能超出视口，先夹回来）
-    iconPos = readIconPos();
-    if (iconPos) {
-        const size = panelSize();
-        placePanel(
-            clamp(iconPos.left, 0, window.innerWidth - size.w),
-            clamp(iconPos.top, 0, window.innerHeight - size.h)
-        );
-    }
+    // 位置不跨刷新保留：每次加载都从默认右下角开始，顺手清掉旧版本写进 GM 存储的残留坐标
+    iconPos = null;
+    try {
+        if (GM_getValue(PANEL_POS_KEY, '')) GM_setValue(PANEL_POS_KEY, '');
+    } catch (e) { }
 
     if (typeof GM_registerMenuCommand === 'function') {
         GM_registerMenuCommand('🎁 展开 / 收起面板', () => {
