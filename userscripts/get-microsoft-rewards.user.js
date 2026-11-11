@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Get Microsoft Rewards (修复/增强版)
 // @namespace    https://github.com/lytree/GMScript
-// @version      1.1.1
-// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。面板图标可拖拽（不记住位置，刷新回右下角）、双击复位；多区域兼容与卡片过滤逻辑优化。
+// @version      1.2.0
+// @description  微软 Rewards 自动助手：集成本地自动搜索、每日活动与自动签到。业务日期按太平洋时间（PT）计算，修正与接口 UTC 日期差 8 小时导致的取不到当天任务；面板图标可拖拽、双击复位。
 // @author       lytree (二次开发); 原作者 Muverix / 基于 QingJ《Get Microsoft Rewards》
 // @license      MIT
 // @icon         https://rewards.bing.com/rewardscdn/images/rewards.png
@@ -59,7 +59,7 @@
     'use strict';
 
     // 版本号与脚本头保持一致，日志里不再写死
-    const SCRIPT_VERSION = (typeof GM_info !== 'undefined' && GM_info?.script?.version) || '1.1.0';
+    const SCRIPT_VERSION = (typeof GM_info !== 'undefined' && GM_info?.script?.version) || '1.2.0';
 
     // ========== 配置 ==========
     const CONFIG = {
@@ -205,14 +205,76 @@
     const randomPick = arr => arr[Math.floor(Math.random() * arr.length)];
     const randomRange = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     const uuid = () => crypto.randomUUID();
-    const getDateStr = () => {
+
+    // ========== 业务日期 ==========
+    // 坑：浏览器本地时区（北京 UTC+8）和 Rewards 的口径对不上，差得还不止一处：
+    //   · Rewards 的每日任务/签到日界是太平洋时间 PT 午夜（北京 15:00 夏令时 / 16:00 冬令时）
+    //   · dashboard 接口里 dailySetPromotions 的 key 有时按 UTC 出，比北京慢 8 小时
+    // 所以这里不用 new Date().getDate() 那套本地值，统一用 Intl 按时区取日历日。
+    const TZ_PT = 'America/Los_Angeles';
+    const TZ_UTC = 'UTC';
+    const pad2 = n => String(n).padStart(2, '0');
+
+    const localParts = () => {
         const d = new Date();
-        return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+        return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
     };
-    const getDateHyphen = () => {
-        const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const tzFmtCache = new Map();
+    function tzFormatter(tz) {
+        let f = tzFmtCache.get(tz);
+        if (!f) {
+            f = new Intl.DateTimeFormat('en-US', {
+                timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+            });
+            tzFmtCache.set(tz, f);
+        }
+        return f;
+    }
+
+    function partsIn(tz) {
+        try {
+            const p = tzFormatter(tz).formatToParts(new Date());
+            const pick = type => Number(p.find(x => x.type === type)?.value) || 0;
+            return { y: pick('year'), m: pick('month'), d: pick('day') };
+        } catch (e) {
+            return localParts();   // 极老内核不支持 timeZone 时退回本地，至少不崩
+        }
+    }
+
+    const dateStrOf = ({ y, m, d }) => `${m}/${d}/${y}`;            // 与接口 key 同格式：M/D/YYYY
+    const ymdOf = ({ y, m, d }) => `${y}-${pad2(m)}-${pad2(d)}`;    // 进度存储用
+    const ymdCompactOf = ({ y, m, d }) => `${y}${pad2(m)}${pad2(d)}`;
+    const partsNum = p => p.y * 10000 + p.m * 100 + p.d;
+    const maxParts = (...list) => list.reduce((a, b) => (partsNum(b) > partsNum(a) ? b : a));
+
+    // 业务日：以 PT 为准（签到、搜索重置都跟这个走）
+    const getDateStr = () => dateStrOf(partsIn(TZ_PT));
+    const getDateHyphen = () => ymdOf(partsIn(TZ_PT));
+
+    // 取当前业务日的候选 key：先 PT，再 UTC。两者相同时只留一个。
+    const getBizDateKeys = () => {
+        const pt = dateStrOf(partsIn(TZ_PT));
+        const utc = dateStrOf(partsIn(TZ_UTC));
+        return pt === utc ? [pt] : [pt, utc];
     };
+
+    // 从 dailySetPromotions 里挑当天那一批。原来取不到就 Object.values().flat()，
+    // 会把前几天的任务一起并进来重复执行；这里改成只回退到「不晚于业务日的最新一批」。
+    function pickDailySet(map) {
+        if (!map || typeof map !== 'object') return [];
+        for (const key of getBizDateKeys()) {
+            if (Array.isArray(map[key]) && map[key].length) return map[key];
+        }
+        const limit = Math.max(...getBizDateKeys().map(k => Date.parse(k)));
+        const usable = Object.keys(map)
+            .filter(k => Array.isArray(map[k]) && map[k].length && Number.isFinite(Date.parse(k)))
+            .map(k => ({ ts: Date.parse(k), v: map[k] }))
+            .filter(e => e.ts <= limit)
+            .sort((a, b) => b.ts - a.ts);
+        return usable.length ? usable[0].v : [];
+    }
+
     const isJSON = s => { try { JSON.parse(s); return true; } catch { return false; } };
     const generateDapiId = () => {
     const raw1 = uuid().replace(/-/g, '');
@@ -735,7 +797,7 @@
         const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
 
         const div = document.createElement('div');
-        div.textContent = `[${new Date().toLocaleTimeString().slice(0, 5)}] ${msg}`;
+        div.textContent = `[${new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })}] ${msg}`;
         box.appendChild(div);
         while (box.childNodes.length > LOG_MAX_LINES) {
             box.removeChild(box.firstChild);
@@ -1081,9 +1143,7 @@
 
             // 3. 统一收集所有活动列表
             const today = getDateStr();
-            const dailySet = dashData.dailySetPromotions?.[today] 
-                          || Object.values(dashData.dailySetPromotions || {}).flat() 
-                          || [];
+            const dailySet = pickDailySet(dashData.dailySetPromotions);
             const morePromos = dashData.morePromotions || dashData.promotions || [];
             const activities = dashData.activities || [];
 
@@ -1328,7 +1388,7 @@
         // 优先获取动态 offerId，无则使用 Sapphire 默认 ID
         let offerId = "Gamification_Sapphire_DailyCheckIn";
         const allPromos = [
-            ...(dashboard?.dailySetPromotions?.[getDateStr()] || []),
+            ...pickDailySet(dashboard?.dailySetPromotions),
             ...(dashboard?.morePromotions || []),
             ...(dashboard?.activities || [])
         ];
@@ -1556,9 +1616,10 @@ nodes.btnRead.onclick = runRead;
 
         const region = customRegion.toLowerCase();
 
-        // 计算今日 YYYYMMDD 日期，用于拦截提前加载的未来每日任务
-        const now = new Date();
-        const todayYmd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        // 计算 YYYYMMDD 上限，用于拦截提前加载的未来每日任务。
+        // 卡片 id 里的日期可能是 PT 也可能是 UTC，取三者中最晚的当上限：
+        // 宁可放过一个未来任务（服务器会拒绝、没有进度），也不能把今天的任务误拦掉。
+        const todayYmd = ymdCompactOf(maxParts(localParts(), partsIn(TZ_PT), partsIn(TZ_UTC)));
 
         const isTrue = (val) => {
             if (typeof val === 'boolean') return val;
@@ -2026,11 +2087,22 @@ nodes.btnRead.onclick = runRead;
                 }
             } catch { }
         } catch { }
-        const hour = new Date().getHours();
+        // 三个时区各打一遍：接口 key 对不上时，一眼能看出是哪个口径
+        const localDate = dateStrOf(localParts());
+        const ptDate = dateStrOf(partsIn(TZ_PT));
+        const utcDate = dateStrOf(partsIn(TZ_UTC));
+        const ptHour = (() => {
+            try {
+                return Number(new Intl.DateTimeFormat('en-US', { timeZone: TZ_PT, hour: '2-digit', hour12: false }).format(new Date())) % 24;
+            } catch (e) {
+                return new Date().getHours();
+            }
+        })();
+        log(`🕒 本地 ${localDate} · PT ${ptDate} · UTC ${utcDate}（PT 日切约 ${24 - ptHour} 小时后）`);
 
-        if (hour >= 0 && hour < 8) {
-            log('⚠️ 当前时间 00:00-08:00，Rewards 每日任务可能尚未刷新');
-            log('💡 建议北京时间 08:00 后运行脚本，避免任务进度显示异常');
+        if (localDate !== ptDate) {
+            log('⚠️ 本地日期已翻篇，Rewards 仍在上一个业务日（以 PT 为准）');
+            log('💡 这段时间跑签到/每日任务容易被算到前一天，建议 PT 日切后再跑');
         }
         log('🌟 脚本就绪 v' + SCRIPT_VERSION);
     })();

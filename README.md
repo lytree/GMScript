@@ -21,7 +21,7 @@
 >
 > **同一功能的脚本只装一个。** Telegram 系只有一个脚本（#2 合并版）；旧版 `telegram-only` 已从仓库移除，若你此前装过，请先停用/删除旧版再装 #2，否则媒体查看器里会出现重复按钮。
 
-#### 1. Get Microsoft Rewards (修复/增强版) · v1.1.1
+#### 1. Get Microsoft Rewards (修复/增强版) · v1.2.0
 
 ```
 https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js
@@ -29,7 +29,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft
 
 👉 [点击安装](https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/get-microsoft-rewards.user.js)
 
-<sub>微软 Rewards 自动助手：本地自动搜索（多热搜源轮换）、每日活动、自动签到、阅读任务，支持 PC / 移动端接口双通道。**浮动图标可拖拽**——位置只在当前页面内有效，不写存储、不跨刷新保留，每次打开都回到右下角（想立刻归位就双击标题栏）；靠近屏幕边缘时展开会自动往内收，展开后标题栏同样可拖，内容超长时面板内部滚动。</sub>
+<sub>微软 Rewards 自动助手：本地自动搜索（多热搜源轮换）、每日活动、自动签到、阅读任务，支持 PC / 移动端接口双通道。**业务日期按太平洋时间（PT）计算**——Rewards 的日界是 PT 午夜（北京 15:00 / 16:00），dashboard 接口的 `dailySetPromotions` key 又可能按 UTC 出，用浏览器本地日期去比会差 8 小时、拿不到当天任务；v1.2.0 起统一以 PT 业务日为准，接口 key 兼容 UTC 口径。**浮动图标可拖拽**——位置只在当前页面内有效，不写存储、不跨刷新保留，每次打开都回到右下角（想立刻归位就双击标题栏）；靠近屏幕边缘时展开会自动往内收，展开后标题栏同样可拖，内容超长时面板内部滚动。</sub>
 
 #### 2. Telegram Media Downloader (Merged) · v1.2.0 · 推荐
 
@@ -47,7 +47,7 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 
 | 文件名 | 版本 | 说明 |
 | --- | --- | --- |
-| [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.1.1 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到、阅读任务。多区域兼容与卡片过滤逻辑优化；**浮动图标可拖拽（不记忆位置，刷新回右下角）、边缘自动避让、双击标题栏复位**，展开后标题栏也可拖，内容超长时面板内部滚动。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
+| [`get-microsoft-rewards.user.js`](userscripts/get-microsoft-rewards.user.js) | 1.2.0 | 微软 Rewards 自动助手：本地自动搜索、每日活动、自动签到、阅读任务。多区域兼容与卡片过滤逻辑优化；**业务日期按 PT 计算**（修正与接口 UTC 日期差 8 小时、取不到当天任务的问题），每日任务批次按业务日挑选、缺失时回退到最近一批且不并入历史、不取未来批次；**浮动图标可拖拽（不记忆位置，刷新回右下角）、边缘自动避让、双击标题栏复位**，展开后标题栏也可拖，内容超长时面板内部滚动。<br>显示名：`Get Microsoft Rewards (修复/增强版)` |
 | [`telegram-media-downloader-merged.user.js`](userscripts/telegram-media-downloader-merged.user.js) | 1.2.0 | 从限制下载的 Telegram 频道获取图片 / 视频 / 语音 / 文件。**旧 `telegram-only` 与 `Telegram-Media-Downloader-Pro` 的合并版**：WebA(webz) + WebK(webk) 双端挂载、原生 `downloadToDisc` 通道优先；**默认不弹目录选择框，文件直接落系统下载目录**（可选指定归档目录）、任务面板（标题栏可拖动、位置记忆、双击复位、取消 / 重试 / 续传 / 4 MB 分片）、右键菜单下载、选择栏批量下载（面板显示 `n/N` 条目进度与当前文件名、可取消）、整组下载（相册 + 评论区）、受保护消息 `.no-forwards` 文字复制解锁、五语 i18n。<br>仓库侧加固：`@match` 严格限定 + 运行时域名守卫，无任何推广 / 邀请 / 统计外链。Telegram 下载脚本**只装这一个**。<br>显示名：`Telegram Media Downloader (Merged)` |
 
 ### 常见问题
