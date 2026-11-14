@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name              FerryLink
 // @namespace         https://github.com/Wjavan/FerryLink
-// @version           1.6.1
+// @version           1.6.5
 // @author            Wjavan
 // @description       支持百度/阿里/天翼/迅雷/夸克/移动/城通网盘直链下载。支持 HTTP/JSON-RPC/cURL，推送至 IDM/XDown/Aria2/NDM/Motrix/终端。基于油小猴(youxiaohou.com)的网盘直链下载助手修改。
 // @copyright         2026, Wjavan (https://github.com/Wjavan)
@@ -18,6 +18,7 @@
 // @match             *://yun.baidu.com/disk/home*
 // @match             *://pan.baidu.com/disk/main*
 // @match             *://yun.baidu.com/disk/main*
+// @match             https://pan.baidu.com/s/*
 // @match             *://openapi.baidu.com/oauth/*
 // @match             *://www.aliyundrive.com/drive*
 // @match             *://www.alipan.com/drive*
@@ -35,6 +36,9 @@
 // @require           https://registry.npmmirror.com/jquery/3.7.0/files/dist/jquery.min.js
 // @require           https://registry.npmmirror.com/sweetalert2/10.16.6/files/dist/sweetalert2.all.min.js
 // @require           https://registry.npmmirror.com/js-md5/0.7.3/files/build/md5.min.js
+// @connect           *
+// @connect           localhost
+// @connect           127.0.0.1
 // @connect           baidu.com
 // @connect           baidupcs.com
 // @connect           jomodns.com
@@ -50,9 +54,6 @@
 // @connect           ctfile.com
 // @connect           tv002.com
 // @connect           ctcontents.com
-// @connect           localhost
-// @connect           127.0.0.1
-// @connect           *
 // @grant             GM_xmlhttpRequest
 // @grant             GM_setClipboard
 // @grant             GM_setValue
@@ -82,7 +83,6 @@
     const driveHdrs = {};          // 城通给的下载地址常配一组头，按 URL 存
     const BTN_ICON = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3v9"></path><path d="M5 8l4 4 4-4"></path><path d="M3 12v3a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-3"></path></svg>';
     const ROW_BUTTON = '<div class="ctfile-button ctfile-button-peer fl-button" title="下载助手">' + BTN_ICON + '下载助手</div>';
-    const clampGap = (v) => Math.max(-40, Math.min(40, Math.round(v)));
     const driveTrace = { url: '', body: '' };
     if (/drive\.ctfile\.com/.test(location.host)) {
         const pageWin = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
@@ -490,16 +490,39 @@
                 base.panelNotice('RPC ' + partErr, 'error');
                 return null;
             }
+            const dir = base.rpcDir(rpc.dir);
+            rpc.dir = dir.dir;
             rpc.url = `${rpc.domain}:${rpc.port}${rpc.path}`;
             return rpc;
         },
         safeRpcFilename(name) {
-            return String(name || '')
+            let s = String(name || '')
                 .replace(/[\x00-\x1F\x7F]/g, '')
-                .replace(/[/\\]/g, '_')
+                .replace(/[/\\:*?"<>|]/g, '_')
                 .replace(/\.\./g, '_')
-                .replace(/^\.+/, '_')
-                .slice(0, 255);
+                .replace(/^\.+/, '_');
+            if (!s.trim()) return '';   // 交回 aria2 用链接的文件名，写死会撞名
+            if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])[. ]*$/i.test(s)) s = '_' + s;   // 裸设备名会吞文件
+            const m = /^(.*?)(\.[^\\/]{1,16})$/.exec(s);
+            let stem = m ? m[1] : s, ext = m ? m[2] : '';
+            // 按字节：ext4/APFS 限 255 字节，控制文件占 12
+            const enc = new TextEncoder();
+            let cps = Array.from(stem), bytes = enc.encode(stem + ext).length;
+            while (cps.length > 1 && bytes > 243) bytes -= enc.encode(cps.pop()).length;
+            return cps.join('') + ext;
+        },
+        rpcDir(dir) {
+            let s = String(dir == null ? '' : dir).trim();
+            if (/^".*"$/.test(s) || /^'.*'$/.test(s)) s = s.slice(1, -1);
+            s = s.replace(/^([A-Za-z])：/, '$1:').trim();
+            if (!s) return { dir: undefined, err: '' };
+            if (/[\x00-\x1F\x7F]/.test(s)) return { dir: undefined, err: '保存路径含不可见字符，本次改用下载器默认目录' };
+            if (!/^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]|\/)/.test(s)) return { dir: undefined, err: '保存路径「' + s + '」不是完整路径，本次改用下载器默认目录；请填到具体目录，如 C:\\Downloads' };
+            if (!/[^\\/]/.test(s)) return { dir: undefined, err: '保存路径「' + s + '」不是有效的保存目录，本次改用下载器默认目录' };
+            const b = s.startsWith('\\\\?\\') || s.startsWith('\\\\.\\') ? s.slice(4) : s;
+            if (b !== s && !/^(?:[A-Za-z]:[\\/]|\\\\)/.test(b)) return { dir: undefined, err: '保存路径「' + s + '」这种长路径写法不受支持，本次改用下载器默认目录' };
+            if (/^(?:[A-Za-z]:|\\)/.test(b) && /[<>"|?*:]/.test(/^[A-Za-z]:/.test(b) ? b.slice(2) : b)) return { dir: undefined, err: '保存路径含文件名不允许的字符，本次改用下载器默认目录' };
+            return { dir: s, err: '' };
         },
         getRandomString(len) {
             len = len || 16;
@@ -688,7 +711,7 @@
             }
             return compFiber.stateNode || compFiber;
         },
-        rpcDefaults: { domain: 'http://localhost', port: '16800', path: '/jsonrpc', token: '', dir: 'C:' },
+        rpcDefaults: { domain: 'http://localhost', port: '16800', path: '/jsonrpc', token: '', dir: '' },
         bcDefaults: { domain: 'http://localhost', port: '8080', path: '/panel/task_add_httpftp_result', user: '', pass: '', dir: '' },
         initDefaultConfig() {
             let value = [
@@ -707,6 +730,7 @@
             value.forEach((v) => {
                 base.getValue(v.name) === undefined && base.setValue(v.name, v.value);
             });
+            if (base.getValue('setting_rpc_dir') === 'C:') base.setValue('setting_rpc_dir', '');   // 清掉旧默认值
             Object.keys(SETTING_CHOICES).forEach((k) => {
                 base.getValue(k) === undefined && base.setValue(k, base.settingChoiceDefault(k));
             });
@@ -780,7 +804,7 @@
                 <label class="fl-setting-label"><div class="fl-label">RPC端口</div><input type="text" placeholder="端口号，例如：Motrix为16800" class="fl-input listener-port" value="${base.esc(base.getValue('setting_rpc_port'))}"></label>
                 <label class="fl-setting-label"><div class="fl-label">RPC路径</div><input type="text" placeholder="路径，默认为/jsonrpc" class="fl-input listener-path" value="${base.esc(base.getValue('setting_rpc_path'))}"></label>
                 <label class="fl-setting-label"><div class="fl-label">RPC密钥</div><input type="password" autocomplete="off" placeholder="无密钥无需填写" class="fl-input listener-token" value="${base.esc(base.getValue('setting_rpc_token'))}"></label>
-                <label class="fl-setting-label"><div class="fl-label">保存路径</div><input type="text" placeholder="留空则使用 aria2 默认下载目录；Windows 示例：C:\\Downloads" class="fl-input listener-dir" value="${base.esc(base.getValue('setting_rpc_dir'))}"></label>
+                <label class="fl-setting-label"><div class="fl-label">保存路径</div><input type="text" placeholder="留空则使用下载器默认目录；Windows 请填完整路径，如 C:\\Downloads" class="fl-input listener-dir" value="${base.esc(base.getValue('setting_rpc_dir'))}"></label>
                 <div class="fl-setting-actions"><button type="button" class="fl-dl-btn fl-dl-btn-secondary listener-reset-rpc">恢复默认</button><button type="button" class="fl-dl-btn fl-dl-btn-secondary listener-test-rpc">测试连接</button></div>
             </div>`;
             Swal.fire({
@@ -1180,7 +1204,17 @@
             $div.append($iframe);
             $('body').append($div);
         },
-        async iframeDownload(link) {
+        // 加速链用 filename 参数补齐文件名
+        _withName(link, filename) {
+            try {
+                if (!/^dl-c-[\w-]+\.drive\.quark\.cn$/i.test(new URL(link).hostname)) return link;
+            } catch (e) { return link; }
+            if (/[?&]filename=/i.test(link)) return link;
+            const name = base.fixFilename(filename || '');
+            if (!name) return link;
+            return link + (link.indexOf('?') >= 0 ? '&' : '?') + 'filename=' + encodeURIComponent(name);
+        },
+        async iframeDownload(link, filename) {
             if (!/^https?:\/\//i.test(link)) {
                 base.panelNotice('提示：下载链接无效！', 'error');
                 return false;
@@ -1200,6 +1234,7 @@
                 base.panelNotice('脚本取不回这条直链（' + why + '），已在新标签打开', 'info', 9000);
                 return { ok: true };
             }
+            link = base._withName(link, filename);
             this.createDownloadIframe();
             $('#downloadIframe').attr('src', link);
             return true;
@@ -1574,7 +1609,7 @@
                         base.panelNotice('已下载 ' + f.filename + '（' + base.sizeFormat(f.rawSize || 0) + '）', 'success', 5000);
                     } else { fail++; $st.html(MARK_NO); base.panelNotice('多链下载失败：' + r.why, 'error'); }
                 } else {
-                    const r = await base.iframeDownload(f.dlink);
+                    const r = await base.iframeDownload(f.dlink, f.filename);
                     if (r === true || (r && r.ok)) { ok++; $st.html(MARK_OK); }
                     else { fail++; $st.html(MARK_NO); if (r && r.why) base.panelNotice('下载失败：' + r.why, 'error', 9000); }
                 }
@@ -1748,19 +1783,33 @@
             const pid = downloadState.protocol;
             if (pid === 'idm') {
                 $btn.text('正在推送 ' + files.length + ' 个任务至 IDM…').prop('disabled', true);
-                let ok = 0, fail = 0;
+                let ok = 0, fail = 0, rejected = '', stopped = false;
                 for (let f of files) {
-                    const r = await base.sendLinkToIDM(f.dlink, f.filename, f.rawSize || 0, base._cdnHeaders(f.dlink));
-                    if (r === 'success') { ok++; $('.fl-dl-file-status[data-status-index="' + f._idx + '"]').html(MARK_OK); }
-                    else { fail++; $('.fl-dl-file-status[data-status-index="' + f._idx + '"]').html(MARK_NO); }
+                    const $cell = $('.fl-dl-file-status[data-status-index="' + f._idx + '"]');
+                    let r;
+                    try {
+                        r = stopped ? { ok: false, kind: 'down' } : await base.sendLinkToIDM(f.dlink, f.filename, f.rawSize || 0, base._cdnHeaders(f.dlink));
+                    } catch (e) {
+                        r = { ok: false, kind: 'error' };
+                    }
+                    if (r.ok) { ok++; $cell.html(MARK_OK); continue; }
+                    fail++; $cell.html(MARK_NO);
+                    if (r.kind === 'reject') rejected = r.state;
+                    if (r.kind === 'down') { rejected = ''; stopped = true; }   // 整批断掉，拒收提示会带偏
                 }
                 $btn.text('推送完成：成功 ' + ok + '，失败 ' + fail);
-                if (fail > 0) base.panelNotice('部分文件推送失败：IDM 未响应', 'error'); else if (ok > 0) base.panelNotice('已推送至 IDM', 'success');
+                if (fail > 0) {
+                    const why = rejected ? 'IDM 拒收任务（状态 ' + rejected + '），请反馈脚本版本'
+                        : ok > 0 ? '已推送 ' + ok + ' 个，' + fail + ' 个未完成，可重试'
+                        : 'IDM 未响应，请检查 IDM 浏览器插件是否启用';
+                    base.panelNotice(why, ok > 0 ? 'warning' : 'error');
+                } else if (ok > 0) base.panelNotice('已推送至 IDM', 'success');
                 setTimeout(() => base._updateMainButton(), 4000);
             } else if (pid === 'rpc') {
                 const d = base.getValue('setting_rpc_domain'), p = base.getValue('setting_rpc_port'), pa = base.getValue('setting_rpc_path');
                 if (!d || !p || !pa) { base.showRPCSetting(false); return; }
                 $btn.text('正在推送 ' + files.length + ' 个任务至 RPC…').prop('disabled', true);
+                const dirErr = base.rpcDir(base.getValue('setting_rpc_dir')).err;
                 let ok = 0, fail = 0;
                 for (let f of files) {
                     const $cell = $('.fl-dl-file-status[data-status-index="' + f._idx + '"]');
@@ -1770,7 +1819,9 @@
                     else { fail++; $cell.html(MARK_NO); base._markFailWithReason($cell, base._lastNotice); }
                 }
                 $btn.text('推送完成：成功 ' + ok + '，失败 ' + fail);
-                if (fail > 0) base.panelNotice('部分文件推送失败，原因见各行说明', 'error'); else if (ok > 0) base.panelNotice('已推送至 Aria2，下载已开始', 'success');
+                const dirNote = dirErr ? '；' + dirErr : '';
+                if (fail > 0) base.panelNotice('部分文件推送失败，原因见各行说明' + dirNote, 'error');
+                else if (ok > 0) base.panelNotice('已推送 ' + ok + ' 个任务给 Aria2，进度请看下载器' + dirNote, dirErr ? undefined : 'success');
                 setTimeout(() => base._updateMainButton(), 4000);
             } else if (pid === 'bc-rpc') {
                 // 先探远程，通就静默推送，不通调本地 BC
@@ -1964,7 +2015,7 @@
             const list = base.settingChoice('setting_idm_rpc') || [];
             const rpc = list.find(i => i && i.default) || list[0] || { id: '1' };
             if (!this.sendLinkToIDM.lock) this.sendLinkToIDM.lock = Promise.resolve();
-            return this.sendLinkToIDM.lock = this.sendLinkToIDM.lock.then(async () => {
+            const run = this.sendLinkToIDM.lock.then(async () => {
                 headers = this.standHeaders(headers);
                 if (!this.sendLinkToIDM.seq) this.sendLinkToIDM.seq = 1;
                 const seq = this.sendLinkToIDM.seq;
@@ -1998,17 +2049,23 @@
                         // withCredentials 关掉会 403
                         withCredentials: true,
                         timeout: 15000,
-                        onload: (r) => resolve(r.responseText || r.response || ''),
-                        ontimeout: () => resolve(''),
-                        onerror: () => resolve(''),
+                        onload: (r) => resolve({ status: r.status, text: r.responseText || r.response || '' }),
+                        ontimeout: () => resolve(null),
+                        onerror: () => resolve(null),
                     });
                 });
-                const res = raw || false;
                 this.sendLinkToIDM.seq++;
-                if (res && String(res).endsWith('3;')) {
-                    return 'success';
-                }
-                return 'fail';
+                // 只认报文尾 3;：头没文档，扩展也不读
+                const body = raw ? String(raw.text).trim() : '';
+                if (raw && raw.status === 200 && /:3;$/.test(body)) return { ok: true };
+                // 只有 404/没响应才短路，其它非 200 不连坐
+                if (!raw || raw.status === 404) return { ok: false, kind: 'down' };
+                if (raw.status !== 200) return { ok: false, kind: 'http' };
+                return { ok: false, kind: 'reject', state: (/:(\d+);$/.exec(body) || [])[1] || '未知' };
+            });
+            // 单次异常不能毒住后续推送
+            return this.sendLinkToIDM.lock = run.catch((e) => {
+                return { ok: false, kind: 'error' };
             });
         },
 
@@ -2048,6 +2105,43 @@
                 // 等框架这一轮画完再插，晚一帧总好过被覆盖后闪一下
                 requestAnimationFrame(() => { if (!$('.fl-button').length) callback(); });
             }).observe(document.body, { childList: true, subtree: true });
+        },
+        // 重渲染会清掉按钮：立刻挂 + 短重试 + 盯 DOM
+        mountWithRetry(mount, guard) {
+            let tries = 0, running = false;
+            const done = () => {
+                try {
+                    if (guard && !guard()) {   // 页型不对就撤掉，不留能点的孤儿
+                        $('.fl-button').remove();
+                        return true;
+                    }
+                    if ($('.fl-button').length) return true;
+                    return mount() === true;
+                } catch (e) {
+                    console.warn('[FerryLink] 挂载回调出错，稍后重试：', e && e.message);
+                    return false;
+                }
+            };
+            // 单飞：密集重绘时不叠多条重试链
+            const retry = () => {
+                if (running) return;
+                running = true;
+                const step = () => {
+                    if (done() || ++tries > 10) { running = false; return; }
+                    setTimeout(step, 300);
+                };
+                step();
+            };
+            this._flRetry = () => { tries = 0; retry(); };
+            retry();
+            if (!this._flWatching) {
+                this._flWatching = true;
+                this.watchDom(() => { if (!running) this._flRetry && this._flRetry(); });
+                // hash 路由不重画整块时没有 DOM 事件，只能靠这两个监听重新判页型
+                const onRoute = () => setTimeout(() => this._flRetry && this._flRetry(), 150);
+                window.addEventListener('hashchange', onRoute);
+                window.addEventListener('popstate', onRoute);
+            }
         },
         addFerryLinkStyle() {
             color = base.settingChoice('setting_theme_color');
@@ -2130,17 +2224,19 @@
             .ali-button { display: inline-flex; align-items: center; justify-content: center; border: 0 solid transparent; border-radius: 5px; white-space: nowrap; flex-shrink: 0; font-size: 14px; line-height: 1.5; outline: 0; touch-action: manipulation; transition: background .3s ease; color: #fff; background: #637dff; margin-left: 20px; padding: 0 12px; position: relative; cursor: pointer; height: 32px; min-height: 32px; }
             .ali-button:hover { background: #7a90ff; }
             .ali-button:focus-visible { outline: 2px solid #637dff; outline-offset: 2px; }
-            .xunlei-button { display: inline-flex; align-items: center; justify-content: center; border: 0 solid transparent; border-radius: 5px; white-space: nowrap; flex-shrink: 0; font-size: 14px; line-height: 1.5; outline: 0; touch-action: manipulation; transition: background .3s ease; color: #fff; background: #3f85ff; margin-left: 12px; padding: 0 12px; position: relative; cursor: pointer; height: 36px; min-height: 32px; }
+            .xunlei-button { display: inline-flex; align-items: center; justify-content: center; border: 0 solid transparent; border-radius: 4px; white-space: nowrap; flex-shrink: 0; font-size: 14px; line-height: 1.5; outline: 0; touch-action: manipulation; transition: background .3s ease; color: #fff; background: #3f85ff; margin-left: 12px; padding: 0 12px; position: relative; cursor: pointer; height: 36px; min-height: 32px; }
+            .xunlei-button i { line-height: 36px; padding-left: 2px; }
             .xunlei-button:hover { background: #619bff; }
             .xunlei-button:focus-visible { outline: 2px solid #3f85ff; outline-offset: 2px; }
-            .tianyi-button { display: inline-flex; align-items: center; justify-content: center; margin-right: 12px; padding: 4px 12px; border-radius: 4px; color: #fff; font-size: 12px; border: 1px solid #0073e3; background: #2b89ea; cursor: pointer; position: relative; min-height: 32px; transition: background .3s ease; width: auto; white-space: nowrap; text-align: center; }
+            .tianyi-button { display: inline-flex; align-items: center; justify-content: center; margin-right: 12px; padding: 0 12px; border-radius: 2px; color: #fff; font-size: 12px; border: 1px solid #0073e3; background: #2b89ea; cursor: pointer; position: relative; min-height: 30px; line-height: 28px; transition: background .3s ease; width: auto; white-space: nowrap; text-align: center; }
             .tianyi-button:hover { border-color: #1874d3; background: #3699ff; }
             .tianyi-button:focus-visible { outline: 2px solid #2b89ea; outline-offset: 2px; }
             .yidong-button { float: left; position: relative; display: flex; align-items: center; justify-content: center; gap: 4px; margin: 20px 24px 20px 0; width: 98px; height: 36px; background: #3181f9; border-radius: 2px; font-size: 14px; color: #fff; line-height: 1; text-align: center; cursor: pointer; min-height: 32px; transition: background .3s ease; }
             .yidong-button svg { width: 20px; height: 20px; flex: 0 0 auto; }
             .yidong-button:hover { background: #2d76e5; }
             .yidong-button:focus-visible { outline: 2px solid #3181f9; outline-offset: 2px; }
-            .quark-button { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #0d53ff; border-radius: 8px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 1.5; outline: 0; color: #fff; background: #0d53ff; margin-right: 10px; padding: 0 10px; position: relative; cursor: pointer; height: 36px; min-height: 32px; transition: background .3s ease; }
+            .quark-button { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; white-space: nowrap; flex-shrink: 0; font-size: 12px; font-weight: 600; line-height: 1.5; outline: 0; color: #fff; background: #0d53ff; margin-right: 16px; padding: 0 10px; position: relative; cursor: pointer; height: 36px; min-height: 32px; transition: background .3s ease; }
+            .quark-button svg { width: 20px; height: 20px; margin-right: 0; flex: 0 0 auto; }
             .quark-button:hover { background: #3a72ff; border-color: #3a72ff; }
             .quark-button:focus-visible { outline: 2px solid #3f85ff; outline-offset: 2px; }
             .ctfile-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; margin: 6px; height: 48px; padding: 0 24px; border: 1px solid #1677ff; border-radius: 8px; background: #1677ff; color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; line-height: 1; white-space: nowrap; flex-shrink: 0; cursor: pointer; transition: background-color .15s, border-color .15s, box-shadow .15s; }
@@ -2148,10 +2244,14 @@
             .ctfile-button:active { background: #003eb3; border-color: #003eb3; }
             .ctfile-button:focus-visible { outline: 2px solid #0958d9; outline-offset: 2px; }
             .ctfile-button svg { width: 18px; height: 18px; flex-shrink: 0; }
+            .fl-button.fl-button-share { display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; height: 36px; padding: 0 16px; margin: 0 8px 0 0; border: 1px solid var(--fl-bd, #09aaff); border-radius: 18px; background: var(--fl-bg, #f0faff); color: var(--fl-fg, #09aaff); font-family: inherit; font-size: 14px; font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap; flex-shrink: 0; cursor: pointer; }
+            .fl-button.fl-button-share:hover { background: var(--fl-bg-h, #e1f4ff); }
+            .fl-button.fl-button-share:focus-visible { outline: 2px solid var(--fl-bd, #09aaff); outline-offset: 2px; }
+            .fl-button.fl-button-share svg { width: 16px; height: 16px; flex-shrink: 0; }
             .ctfile-button-sm { height: 30px; padding: 0 14px; gap: 6px; font-size: 14px; font-weight: 600; }
             .ctfile-button-sm svg { width: 16px; height: 16px; }
             /* 跟「上传/上传文件夹」同款：色值、高度、圆角挂载时从旁边按钮读回来（--fl-*） */
-            .ctfile-button-peer { margin: 0; height: var(--fl-h, 32px); padding: 0 14px; gap: 6px; border: 1px solid var(--fl-bd, #1677ff); border-radius: var(--fl-r, 8px); background: var(--fl-bg, #1677ff); color: var(--fl-fg, #fff); font-size: var(--fl-fs, 14px); font-weight: var(--fl-fw, 600); }
+            .ctfile-button-peer { margin: 0; height: var(--fl-h, 32px); padding: 0 16px; gap: 8px; border: 1px solid var(--fl-bd, #1677ff); border-radius: var(--fl-r, 8px); background: var(--fl-bg, #1677ff); color: var(--fl-fg, #fff); font-size: var(--fl-fs, 14px); font-weight: var(--fl-fw, 600); }
             .ctfile-button-peer:hover { box-shadow: inset 0 0 0 999px rgba(255, 255, 255, .14); }
             .ctfile-button-peer:active { box-shadow: inset 0 0 0 999px rgba(0, 0, 0, .12); }
             .ctfile-button-peer:focus-visible { outline: 2px solid var(--fl-bd, #1677ff); outline-offset: 2px; }
@@ -2302,7 +2402,7 @@
     };
     const LOCAL_CONFIG = {
         baidu: {
-            pcs: {"0": "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1", "1": "https://pan.baidu.com/api/sharedownload?channel=chunlei&clienttype=12&web=1&app_id=250528", "2": "https://pan.baidu.com/share/tplconfig?fields=sign,timestamp&channel=chunlei&web=1&app_id=250528&clienttype=0", "3": "https://openapi.baidu.com/oauth/2.0/authorize?client_id=IlLqBbU3GjQ0t46TRwFateTprHWl39zF&response_type=token&redirect_uri=oob&confirm_login=0&scope=basic,netdisk", "4": "https://openapi.baidu.com/oauth/2.0/login_success"},
+            pcs: {"0": "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1", "1": "https://pan.baidu.com/api/sharedownload?channel=chunlei&web=1&app_id=250528", "2": "https://pan.baidu.com/share/tplconfig?fields=sign,timestamp&channel=chunlei&web=1&app_id=250528&clienttype=0", "3": "https://openapi.baidu.com/oauth/2.0/authorize?client_id=IlLqBbU3GjQ0t46TRwFateTprHWl39zF&response_type=token&redirect_uri=oob&confirm_login=0&scope=basic,netdisk", "4": "https://openapi.baidu.com/oauth/2.0/login_success"},
             btn: {"home": ".tcuLAu", "main": ".wp-s-agile-tool-bar__header"},
             ua: "pan.baidu.com",
             api: {0: "API 下载", 1: ''},
@@ -2424,24 +2524,28 @@
                 // 不走 didOpen 调 showLoading：它包在 setTimeout 里，面板已在 DOM
                 Swal.fire({ title: '获取下载链接', html: '<div class="fl-fetch-progress">正在获取…</div>', allowOutsideClick: false, showConfirmButton: false });
                 Swal.showLoading();
+                if (pageNum === 'share') this.setBDUSS();
                 try { await this.getPCSLink(); } catch (err) { Swal.close(); base.renderErrorPanel('获取下载链接失败：' + (err && err.message || '未知错误'), this); } finally { if (document.querySelector('.swal2-popup.swal2-loading')) Swal.close(); }
             });
         },
         addButton() {
-            if (!pageNum) return;
-            let $button = $(`<div class="fl-button" style="position: relative; display: inline-block; margin-right: 8px;"><div style="color:#fff;background: ${color};border-color:${color}" class="g-button g-button-blue"><span class="g-button-right"><em class="icon icon-download"></em><span class="text" style="width: 60px;">下载助手</span></span></div>`);
-            if (pageNum === 'main') {
-                $button = $(`<div class="fl-button" style="position: relative; display: inline-block; margin-right: 8px;"><button class="u-button u-button--primary u-button--small is-round is-has-icon" style="background: ${color};border-color: ${color};font-size: 14px; padding: 8px 16px; border: none;"><i class="u-icon u-icon-download"></i><span>下载助手</span></button>`);
-            }
-            const sel = pageNum === 'home' ? panInfo.btn.home : panInfo.btn.main;
-            const tryInject = () => {
-                let $toolWrap = $(sel);
-                if (!$toolWrap.length || $('.fl-button').length) return false;
-                $toolWrap.prepend($button);
+            const $button = $(`<div class="fl-button" style="position: relative; display: inline-block; margin-right: 8px;"><div style="color:#fff;background: ${color};border-color:${color}" class="g-button g-button-blue"><span class="g-button-right"><em class="icon icon-download"></em><span class="text" style="width: 60px;">下载助手</span></span></div>`);
+            const $mainButton = $(`<div class="fl-button" style="position: relative; display: inline-block; margin-right: 16px;"><button class="u-button u-button--primary u-button--small is-round is-has-icon" style="background: ${color};border-color: ${color};font-size: 14px; height: 32px; padding: 8px 16px; border: none; border-radius: 16px;"><i class="u-icon u-icon-download"></i><span>下载助手</span></button>`);
+            const $shareButton = $(`<a class="fl-button fl-button-share" href="javascript:;" title="下载助手">${BTN_ICON}<span>下载助手</span></a>`);
+            if (color) [['--fl-fg', color], ['--fl-bd', color], ['--fl-bg', color + '1f'], ['--fl-bg-h', color + '3d']].forEach((kv) => $shareButton[0].style.setProperty(kv[0], kv[1]));
+            base.mountWithRetry(() => {
+                pageNum = this.detectPage();
+                if (pageNum === 'share' && this._shareIsMine()) return true;
+                let sel = pageNum === 'share' ? this._shareMountSel() : (panInfo.btn[pageNum] || panInfo.btn.main);
+                let $toolWrap = pageNum === 'share' ? $(sel).first() : $(sel);
+                if (!$toolWrap.length) return false;
+                let $btn = pageNum === 'main' ? $mainButton : (pageNum === 'share' ? $shareButton : $button);
+                if (pageNum === 'share' && !/x-button-box/.test(sel)) $toolWrap.append($btn);
+                else $toolWrap.prepend($btn);
                 return true;
-            };
-            if (!tryInject()) base.listenElement(sel, tryInject);
-            this.setBDUSS();
+            }, () => !!this.detectPage());
+            // 分享页等点击再读，避免只打开页面就落库
+            if (pageNum !== 'share') this.setBDUSS();
             this.addPageListener();
         },
         async getToken() {
@@ -2544,6 +2648,7 @@
                 }
         },
         async getPCSLink(maxRequestTime = 1) {
+            if (pageNum === 'share') return this._shareLink();
             selectedFiles = this.getSelectedList();
             let fidArray = this._getFidArray(), res;
             const authFail = () => { Swal.close(); return base.renderErrorPanel('百度授权未完成：请刷新重试，仍失败请确认已登录百度', this); };
@@ -2658,12 +2763,177 @@
                 base.renderDownloadPanel(normalized, this);
             }
         },
-        normalizeList(list) {
+        _shareInfo() {
+            let scope = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
+            let dump = null;
+            try { dump = scope.locals && scope.locals.dump ? scope.locals.dump() : null; } catch (e) { }
+            let has = dump && typeof dump === 'object';
+            let pick = (k) => {
+                let v = has ? dump[k] : null;
+                v = v && typeof v === 'object' && 'value' in v ? v.value : v;
+                return v === undefined || v === null ? '' : String(v);
+            };
+            let raw = has && dump.file_list ? (dump.file_list.value || dump.file_list) : null;
+            let list = Array.isArray(raw) ? raw : [];
+            let sekey = String(scope.currentSekey || '');
+            let m = /^\/s\/([^/?#]+)/.exec(location.pathname);
+            return { pick: pick, list: list, sekey: sekey, surl: m ? m[1] : '', hasDump: !!has };
+        },
+        // 要带页面来源，用页面 fetch 发
+        _shareRequest(url, method, body) {
+            let scope = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
+            let toJson = (t) => {
+                if (t && typeof t === 'object') return t;
+                try { return JSON.parse(t); } catch (e) {
+                    throw new Error('接口返回的不是数据（可能未登录或页面已改版）');
+                }
+            };
+            if (typeof scope.fetch === 'function') {
+                let opt = { method: method, credentials: 'include' };
+                if (method !== 'GET') {
+                    opt.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+                    opt.body = body;
+                }
+                // 卡住会占死单飞位，到点自己断
+                let ctrl = new AbortController();
+                opt.signal = ctrl.signal;
+                let timer = setTimeout(() => ctrl.abort(), 20000);
+                return scope.fetch(url, opt).then(r => r.text()).then(t => { clearTimeout(timer); return toJson(t); }).catch((e) => {
+                    clearTimeout(timer);
+                    // POST 可能已被收下，重发等于提交两次
+                    if (method !== 'GET') throw new Error(e && e.name === 'AbortError' ? '请求超时，请稍后重试' : ((e && e.message) || '请求超时或失败，请稍后重试'));
+                    return Promise.resolve(base.get(url)).then(toJson);
+                });
+            }
+            return method === 'GET'
+                ? Promise.resolve(base.get(url)).then(toJson)
+                : Promise.resolve(base.post(url, body, { 'Content-Type': 'application/x-www-form-urlencoded', 'Referer': location.origin }, 'text')).then(toJson);
+        },
+        _shareMountSel() {
+            let cands = ['.module-share-bottom-bar .x-button-box', '.module-share-top-bar .x-button-box', '.share-header-bar'];
+            for (let i = 0; i < cands.length; i++) {
+                if (document.querySelector(cands[i])) return cands[i];
+            }
+            return '';
+        },
+        // 自己的分享有「取消分享」，不挂按钮
+        _shareIsMine() {
+            let bars = document.querySelectorAll('.share-header-bar, .module-share-top-bar, .module-share-bottom-bar');
+            return Array.from(bars).some(b => Array.from(b.querySelectorAll('button, a')).some(el => /^取消分享$/.test((el.textContent || '').trim())));
+        },
+        // data-file-key 就是 fs_id
+        _shareChecked() {
+            let rows = document.querySelectorAll('.JS-list-view-item[data-file-key]');
+            if (!rows.length) return null;
+            let picked = [];
+            rows.forEach(r => {
+                if (!r.classList.contains('JS-item-active') && !r.querySelector('.wp-checkbox--checked')) return;
+                let id = r.getAttribute('data-file-key') || '';
+                if (id) picked.push({ fs_id: id });
+            });
+            return picked;
+        },
+        // 读不到返回 null，跟「确实没勾」区分开
+        _shareSelected() {
+            let scope = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
+            let ctx = null;
+            try { ctx = require('system-core:context/context.js'); } catch (e) { }
+            if (!ctx) { try { ctx = scope.require('system-core:context/context.js'); } catch (e) { } }
+            let got = null;
+            try { got = ctx && ctx.instanceForSystem.list.getSelected(); } catch (e) { }
+            if (Array.isArray(got) && got.length) return got;
+            let dom = this._shareChecked();
+            return dom === null ? (Array.isArray(got) ? got : null) : dom;
+        },
+        async _shareLink() {
+            if (this._shareChain) return this._shareChain;
+            this._shareChain = this._shareFetch();
+            try { return await this._shareChain; } finally { this._shareChain = null; }
+        },
+        async _shareFetch() {
+            let ref = this._shareInfo();
+            const fail = (msg) => { Swal.close(); base.renderErrorPanel(msg, this); };
+            if (!ref.surl) return fail('读不到分享标识，请刷新页面后重试');
+            if (!ref.hasDump) return fail('读不到页面信息（locals 未就绪），请刷新页面后重试');
+            // 只有明确未登录才拦，字段缺失交给接口报错
+            if (ref.pick('loginstate') === '0') return fail('分享页下载需要登录百度网盘，请登录后重试');
+            if (!ref.pick('shareid') || !ref.pick('share_uk')) return fail('页面里的分享标识不完整，请刷新页面后重试');
+            let read = this._shareSelected();
+            let meta = {};
+            ref.list.forEach(v => { if (v && v.fs_id !== undefined && v.fs_id !== null) meta[String(v.fs_id)] = v; });
+            let picked = (read || []).map(v => Object.assign({}, v, meta[String(v.fs_id)] || {}));
+            // 认错了只会多提示，不会多下文件
+            let hasPicker = !!(document.querySelector('.JS-list-view-item .wp-checkbox, .JS-list-view-item input[type=checkbox]'));
+            // 单文件页没勾选框，直接用清单里那一个
+            if (!picked.length && ref.list.length === 1 && !hasPicker) picked = ref.list;
+            // 多文件又没勾选框：不猜，明说
+            if (!picked.length && !hasPicker && ref.list.length > 1) return fail('页面上没有勾选框，请刷新页面或换用支持的分享版式');
+            if (!picked.length && read === null) return fail('读不到页面的勾选状态，请刷新页面后重试');
+            if (!picked.length) { Swal.close(); base.renderDownloadPanel([], this); return; }
+            // 类型只能来自页面清单，填不到就别猜
+            if (picked.some(v => v && (v.isdir == null || v.isdir === ''))) return fail('读不到文件类型，请刷新页面后重试');
+            let files = picked.filter(v => v && +v.isdir !== 1);
+            if (!files.length) { Swal.close(); message.error('提示：分享页只支持文件，请勾选文件后再试！'); return; }
+            if (files.length > 20) return fail('一次最多取 20 个文件（当前 ' + files.length + ' 个），请减少勾选后重试');
+            let bdstoken = ref.pick('bdstoken');
+            let tplUrl = panInfo.pcs[2] + '&surl=' + encodeURIComponent(ref.surl) + (bdstoken ? '&bdstoken=' + encodeURIComponent(bdstoken) : '');
+            let tpl = await this._shareRequest(tplUrl, 'GET');
+            let sign = (tpl && tpl.data) || {};
+            if (!sign.sign || !sign.timestamp) {
+                let why = tpl && tpl.errno ? '（errno ' + tpl.errno + (tpl.errmsg ? '：' + tpl.errmsg : '') + '）' : '';
+                return fail('取不到分享签名' + why + '，请刷新页面后重试');
+            }
+            let dlUrl = panInfo.pcs[1] + '&sign=' + encodeURIComponent(sign.sign) + '&timestamp=' + encodeURIComponent(sign.timestamp);
+            let uk = encodeURIComponent(ref.pick('share_uk'));
+            let primaryid = encodeURIComponent(ref.pick('shareid'));
+            let rows = [];
+            for (let i = 0; i < files.length; i++) {
+                let it = files[i];
+                if (files.length > 1) base.tipLoading('正在获取下载链接 ' + (i + 1) + '/' + files.length + '…');
+                let fid = it.fs_id || it.file_id || it.id || '';
+                let row = { server_filename: it.server_filename || it.filename || '', size: it.size, isdir: it.isdir };
+                if (!fid) {
+                    row.dlink = '读不到文件标识，请刷新页面后重试';
+                    rows.push(row);
+                    continue;
+                }
+                try {
+                    let form = 'encrypt=0&product=share'
+                        + (ref.sekey ? '&extra=' + encodeURIComponent(JSON.stringify({ sekey: ref.sekey })) : '')
+                        + '&timestamp=' + encodeURIComponent(sign.timestamp)
+                        + '&uk=' + uk
+                        + '&primaryid=' + primaryid
+                        + '&fid_list=' + encodeURIComponent(JSON.stringify([String(fid)]));
+                    let res = await this._shareRequest(dlUrl, 'POST', form);
+                    if (res && res.errno === 0 && Array.isArray(res.list) && res.list.length) {
+                        row = Object.assign(row, res.list[0]);
+                    } else if (res && res.errno === 0 && typeof res.list === 'string') {
+                        row.dlink = '该文件超过百度可获取限制，需保存到网盘后下载';
+                    } else if (res && res.errno === 0) {
+                        row.dlink = '接口没有返回下载地址，请稍后重试';
+                    } else if (res && res.errno === -20) {
+                        row.dlink = '百度要求人机验证，请先在该页面点一次「下载」输完验证码，再回来重试';
+                    } else if (res && (res.errno === 9019 || /needverify/.test(String(res.errmsg)))) {
+                        row.dlink = '百度要求身份验证，请刷新页面后重试';
+                    } else {
+                        row.dlink = '获取下载地址失败：' + String((res && (res.errmsg || res.show_msg || res.errno)) || '').slice(0, 60);
+                    }
+                } catch (e) {
+                    row.dlink = '获取下载地址失败：' + ((e && e.message) || '未知错误');
+                }
+                rows.push(row);
+                if (i + 1 < files.length) await base.sleep(1000);
+            }
+            base.renderDownloadPanel(this.normalizeList(rows, true), this);
+        },
+        normalizeList(list, noAuth) {
+            // 分享直链不需要授权，别贴个人令牌
+            let token = noAuth ? '' : base.getValue('baidu_access_token');
             return list.map(v => {
                 let dlink = '';
                 if (v.dlink) {
-                    dlink = /^https?:\/\//.test(v.dlink)
-                        ? v.dlink + '&access_token=' + base.getValue('baidu_access_token')
+                    dlink = /^https?:\/\//.test(v.dlink) && token
+                        ? v.dlink + '&access_token=' + token
                         : v.dlink;
                 }
                 return {
@@ -2711,9 +2981,13 @@
             }
         },
         detectPage() {
-            let path = location.pathname;
+            let path = location.pathname, hash = location.hash || '';
             if (/^\/disk\/home/.test(path)) return 'home';
-            if (/^\/disk\/main/.test(path)) return 'main';
+            if (/^\/disk\/main/.test(path)) {
+                if (/^#\/recyclebin/.test(hash)) return '';
+                return 'main';
+            }
+            if (/^\/s\//.test(path)) return 'share';
             return '';
         },
         async initFerryLink() {
@@ -2725,7 +2999,7 @@
             this.addButton();
             base.createTip();
             base.registerMenuCommand();
-            this.preflightAccount();
+            if (pageNum !== 'share') this.preflightAccount();
         },
         async initAuthorize() {
             let authPollTimer = setInterval(() => {
@@ -2812,30 +3086,24 @@
                     } catch (e) { return ''; }
                 },
         addButton() {
-            if (!pageNum) return;
-            let $toolWrap;
             let $button = $(`<div class="ali-button fl-button"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="16" height="16"><path d="M853.333 938.667H170.667a85.333 85.333 0 0 1-85.334-85.334v-384A85.333 85.333 0 0 1 170.667 384H288a32 32 0 0 1 0 64H170.667a21.333 21.333 0 0 0-21.334 21.333v384a21.333 21.333 0 0 0 21.334 21.334h682.666a21.333 21.333 0 0 0 21.334-21.334v-384A21.333 21.333 0 0 0 853.333 448H736a32 32 0 0 1 0-64h117.333a85.333 85.333 0 0 1 85.334 85.333v384a85.333 85.333 0 0 1-85.334 85.334z" fill="#fff"/><path d="M715.03 543.552a32.81 32.81 0 0 0-46.251 0L554.005 657.813v-540.48a32 32 0 0 0-64 0v539.734L375.893 543.488a32.79 32.79 0 0 0-46.229 0 32.427 32.427 0 0 0 0 46.037l169.557 168.811a32.81 32.81 0 0 0 46.251 0l169.557-168.81a32.47 32.47 0 0 0 0-45.974z" fill="#FF9C00"/></svg><span>下载助手</span></div>`);
-            if (pageNum === 'home') {
-                const fallbacks = [
-                    panInfo.btn.home,
-                    '[class*="header--"] [class*="actions--"]',
-                    '[class*="file-list-header"] [class*="action"]',
-                    'header [class*="upload"]',
-                ];
-                const tryInject = () => {
-                    for (const sel of fallbacks) {
-                        let $el = $(sel);
-                        if ($el.length && $('.fl-button').length === 0) {
-                            $el.append($button);
-                            return true;
-                        }
+            const fallbacks = [
+                panInfo.btn.home,
+                '[class*="header--"] [class*="actions--"]',
+                '[class*="file-list-header"] [class*="action"]',
+                'header [class*="upload"]',
+            ];
+            const tryInject = () => {
+                for (const sel of fallbacks) {
+                    let $el = $(sel);
+                    if ($el.length) {
+                        $el.append($button);
+                        return true;
                     }
-                    return false;
-                };
-                if (!tryInject()) {
-                    fallbacks.forEach(sel => base.listenElement(sel, tryInject));
                 }
-            }
+                return false;
+            };
+            base.mountWithRetry(() => { pageNum = this.detectPage(); return tryInject(); }, () => this.detectPage() === 'home');
             this.addPageListener();
         },
         async getPCSLink() {
@@ -2966,7 +3234,7 @@
 
         detectPage() {
             let path = location.pathname;
-            if (/^\/(drive)/.test(path)) return 'home';
+            if (/^\/(drive)/.test(path) && !/recycle-bin/.test(path)) return 'home';
             return '';
         },
         isOnlyFolder() {
@@ -3016,17 +3284,14 @@
             }
         },
         addButton() {
-            if (!pageNum) return;
-            let $toolWrap;
             let $button = $(`<div class="tianyi-button fl-button">下载助手</div>`);
-            if (pageNum === 'home') {
-                            base.listenElement(panInfo.btn.home, () => {
-                                let container = document.querySelector(panInfo.btn.home);
-                                if (container && $('.fl-button').length === 0) {
-                                                    this._insertBeforeUpload(container, $button);
-                                                }
-                            })
-                        }
+            base.mountWithRetry(() => {
+                pageNum = this.detectPage();
+                let container = document.querySelector(panInfo.btn.home);
+                if (!container) return false;
+                this._insertBeforeUpload(container, $button);
+                return true;
+            }, () => this.detectPage() === 'home');
             this.addPageListener();
         },
         async getToken() {
@@ -3147,7 +3412,7 @@
         },
         detectPage() {
             let path = location.pathname;
-            if (/^\/web\/main/.test(path)) return 'home';
+            if (/^\/web\/main/.test(path) && !/recycle/i.test(path)) return 'home';
             return '';
         },
         isOnlyFolder() {
@@ -3228,7 +3493,7 @@
         addButton() {
             if (!pageNum) return;
             let $toolWrap;
-            let $button = $(`<div class="xunlei-button fl-button"><i class="xlpfont xlp-download"></i><span style="font-size: 13px;margin-left: 6px;">下载助手</span></div>`);
+            let $button = $(`<div class="xunlei-button fl-button"><i class="xlpfont xlp-download"></i><span style="font-size: 13px; margin-left: 0; line-height: 13px;">下载助手</span></div>`);
             if (pageNum === 'home') {
                 this._smartListen(() => {
                     let container = this._findHomeContainer();
@@ -3527,13 +3792,6 @@
         addPageListener() {
             if (this._listenerBound) return;
             this._listenerBound = true;
-            window.addEventListener('hashchange', async (e) => {
-                let home = 'https://pan.quark.cn/list#/', all = 'https://pan.quark.cn/list#/list/all';
-                if (e.oldURL === home && e.newURL === all) return;
-                await base.sleep(150);
-                if ($('.quark-button').length > 0) return;
-                this.addButton();
-            });
             doc.on('click', '.fl-button', async (e) => {
                 if ($(e.target).closest('.g-button-menu, .menu').length) return;
                 Swal.showLoading();
@@ -3541,15 +3799,14 @@
             });
         },
         addButton() {
-            if (!pageNum) return;
-            let $toolWrap;
-            let $button = $(`<div class="quark-button fl-button"><svg width="22" height="22" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 2-2z"/><path d="M14 8h1.553c.85 0 1.16.093 1.47.267.311.174.556.43.722.756.166.326.255.65.255 1.54v4.873c0 .892-.089 1.215-.255 1.54-.166.327-.41.583-.722.757-.31.174-.62.267-1.47.267H6.447c-.85 0-1.16-.093-1.47-.267a1.778 1.778 0 01-.722-.756c-.166-.326-.255-.65-.255-1.54v-4.873c0-.892.089-1.215.255-1.54.166-.327.41-.583.722-.757.31-.174.62-.267 1.47-.267H11"/><path stroke-linecap="round" stroke-linejoin="round" d="M11 3v10"/></g></svg><span>下载助手</span></div>`);
-            if (pageNum === 'home') {
-                base.listenElement(panInfo.btn.home, () => {
-                    $toolWrap = $(panInfo.btn.home);
-                    $('.fl-button').length === 0 && $toolWrap.prepend($button);
-                });
-            }
+            const $button = $(`<div class="quark-button fl-button"><svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd" stroke="#fff" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 2-2z"/><path d="M14 8h1.553c.85 0 1.16.093 1.47.267.311.174.556.43.722.756.166.326.255.65.255 1.54v4.873c0 .892-.089 1.215-.255 1.54-.166.327-.41.583-.722.757-.31.174-.62.267-1.47.267H6.447c-.85 0-1.16-.093-1.47-.267a1.778 1.778 0 01-.722-.756c-.166-.326-.255-.65-.255-1.54v-4.873c0-.892.089-1.215.255-1.54.166-.327.41-.583.722-.757.31-.174.62-.267 1.47-.267H11"/><path stroke-linecap="round" stroke-linejoin="round" d="M11 3v10"/></g></svg><span>下载助手</span></div>`);
+            base.mountWithRetry(() => {
+                pageNum = this.detectPage();
+                let $toolWrap = $(panInfo.btn.home);
+                if (!$toolWrap.length) return false;
+                $toolWrap.prepend($button);
+                return true;
+            }, () => this.detectPage() === 'home');
         },
         // 夸克不给 token 就派到限速节点，约 30KB/s
         async getAccelToken() {
@@ -3675,8 +3932,9 @@
             }
         },
         detectPage() {
-            let path = location.pathname;
-            if (/^\/(list)/.test(path)) return 'home';
+            // pathname 恒为 /list，靠 hash 判页；#/ 也是落地路由
+            let hash = location.hash || '';
+            if (!hash || hash === '#/' || /^#\/list\/all(?:$|[?/])/.test(hash)) return 'home';
             return '';
         },
         isOnlyFolder() {
@@ -3720,15 +3978,14 @@
             });
         },
         addButton() {
-            if (!pageNum) return;
-            let $toolWrap;
             let $button = $(`<div class="yidong-button fl-button"><svg viewBox="0 0 40 40" width="20" height="20" fill="currentColor" stroke="none" aria-hidden="true" focusable="false"><path d="M19 5h2v1h-2zM18 6h4v1h-4zM18 7h4v1h-4zM18 8h4v1h-4zM18 9h4v1h-4zM18 10h4v1h-4zM18 11h4v1h-4zM18 12h4v1h-4zM18 13h4v1h-4zM18 14h4v1h-4zM18 15h4v1h-4zM18 16h4v1h-4zM18 17h4v1h-4zM12 18h3v1h-3zM18 18h4v1h-4zM25 18h3v1h-3zM12 19h3v1h-3zM18 19h4v1h-4zM25 19h3v1h-3zM12 20h4v1h-4zM18 20h4v1h-4zM24 20h4v1h-4zM13 21h4v1h-4zM18 21h4v1h-4zM23 21h4v1h-4zM14 22h12v1h-12zM14 23h12v1h-12zM15 24h10v1h-10zM16 25h8v1h-8zM17 26h6v1h-6zM5 27h2v1h-2zM18 27h4v1h-4zM33 27h2v1h-2zM4 28h4v1h-4zM19 28h2v1h-2zM32 28h4v1h-4zM4 29h4v1h-4zM32 29h4v1h-4zM4 30h4v1h-4zM32 30h4v1h-4zM4 31h4v1h-4zM32 31h4v1h-4zM4 32h32v1h-32zM4 33h32v1h-32zM4 34h32v1h-32zM5 35h30v1h-30z"></path></svg>下载助手</div>`);
-            if (pageNum === 'home') {
-                base.listenElement(panInfo.btn.home, () => {
-                    $toolWrap = $(panInfo.btn.home);
-                    $('.fl-button').length === 0 && $toolWrap.prepend($button);
-                })
-            }
+            base.mountWithRetry(() => {
+                pageNum = this.detectPage();
+                let $toolWrap = $(panInfo.btn.home);
+                if (!$toolWrap.length) return false;
+                $toolWrap.prepend($button);
+                return true;
+            }, () => this.detectPage() === 'home');
             this.addPageListener();
         },
         async getFileUrlByOnce(item, index) {
@@ -3930,8 +4187,11 @@
             return [];
         },
         detectPage() {
-            let path = location.pathname;
-            if (/^\/w/.test(path)) return 'home';
+            let path = location.pathname, hash = location.hash || '';
+            if (/^\/w/.test(path)) {
+                if (/^#\/(recyclebin|recycle)/.test(hash)) return '';
+                return 'home';
+            }
             return '';
         },
         isOnlyFolder() {
@@ -4015,41 +4275,22 @@
                 '--fl-fs': cs.fontSize,
                 '--fl-fw': cs.fontWeight,
             });
-            // 紧贴在一起的是连体组，插到组外
-            let sib = up.nextElementSibling;
-            let compact = !!sib && (sib.getBoundingClientRect().left - up.getBoundingClientRect().right) < 2;
-            let anchor = compact ? up.parentElement : up;
-            if (!anchor) return false;
-            // 往上找第一对有间隙的相邻控件
-            let target = 0, node = up;
-            for (let d = 0; d < 3 && node && !target; d++) {
-                node = node.parentElement;
-                if (!node) break;
-                let kids = [...node.children].filter(el => el.getBoundingClientRect().width > 0);
-                for (let i = 1; i < kids.length; i++) {
-                    let g = kids[i].getBoundingClientRect().left - kids[i - 1].getBoundingClientRect().right;
-                    if (g > 2 && g < 60) { target = Math.round(g); break; }
-                }
+            let group = up.closest('.ct-btn-split');
+            let anchor = group;
+            if (!anchor) {
+                let sib = up.nextElementSibling;
+                let compact = !!sib && (sib.getBoundingClientRect().left - up.getBoundingClientRect().right) < 2;
+                anchor = compact ? up.parentElement : up;
             }
-            if (!target) target = 8;
-            // 组自带左边距，用负 margin 抵掉，不动城通元素
-            let ml = parseFloat(getComputedStyle(anchor).marginLeft) || 0;
-            $btn.css('margin-right', clampGap(target - ml) + 'px');
+            if (!anchor) return false;
+            $btn.css('margin-right', '0px');
             anchor.before($btn[0]);
-            // 字体和布局可能晚一步才定，多校几次，每次都往目标值上贴
-            let fix = () => {
-                if (!$btn[0].isConnected || !up.isConnected) return;
-                let cur = up.getBoundingClientRect().left - $btn[0].getBoundingClientRect().right;
-                if (Math.abs(target - cur) >= 0.5) {
-                    let mr = parseFloat(getComputedStyle($btn[0]).marginRight) || 0;
-                    $btn.css('margin-right', clampGap(mr + (target - cur)) + 'px');
-                    cur = up.getBoundingClientRect().left - $btn[0].getBoundingClientRect().right;
-                }
-            };
-            [0, 150, 400].forEach(t => {
-                if (!t && typeof requestAnimationFrame === 'function') requestAnimationFrame(fix);
-                else setTimeout(fix, t);
-            });
+            let gap = anchor.getBoundingClientRect().left - $btn[0].getBoundingClientRect().right;
+            if (gap < 2) {
+                let ref = anchor.nextElementSibling;
+                let ml = ref ? parseFloat(getComputedStyle(ref).marginLeft) || 0 : 0;
+                $btn.css('margin-right', (ml > 0 ? ml : 8) + 'px');
+            }
             return true;
         },
         _watchHash() {
@@ -4067,7 +4308,25 @@
             let m = /^\/(f|d)\/([^/?#]+)/.exec(location.pathname);
             let pass = '';
             try { pass = new URLSearchParams(location.search).get('p') || ''; } catch (e) { }
+            if (!pass && m) pass = this._localPass('passcode', m[2]);
             return { type: m ? m[1] : '', id: m ? m[2] : '', pass };
+        },
+        // 提取码与通行证都由页面写在本地，按 :<分享 id> 后缀找
+        _localPass(prefix, id) {
+            let tail = ':' + id;
+            for (let i = 0; i < localStorage.length; i++) {
+                let key = '';
+                try { key = localStorage.key(i) || ''; } catch (e) { }
+                if (key.indexOf(prefix) !== 0 || key.slice(-tail.length) !== tail) continue;
+                let raw = '';
+                try { raw = localStorage.getItem(key) || ''; } catch (e) { }
+                try {
+                    let o = JSON.parse(raw);
+                    let v = (o && (o.pass || o.value)) || '';
+                    if (v) return v;
+                } catch (e) { }
+            }
+            return '';
         },
         async getPCSLink() {
             let ref = this._shareRef();
@@ -4366,14 +4625,25 @@
             let unit = { B: 1, KB: 1024, MB: 1048576, GB: 1073741824, TB: 1099511627776 };
             return Math.round((parseFloat(m[1]) || 0) * (unit[(m[2] || 'B').toUpperCase()] || 1));
         },
+        // 文件信息与通行证一次取回
+        async _resource(ref, ap) {
+            let url = 'https://urlapi2.ctfile.com/api/v2/resource?kind=file&id=' + encodeURIComponent(ref.id)
+                + '&folder_id=0&fk=&passcode=' + encodeURIComponent(ref.pass) + '&type_id=0'
+                + (ap ? '&access_pass=' + encodeURIComponent(ap) : '');
+            let res = await base.get(url);
+            let d = (res && res.data) || {};
+            return { code: (res && res.code) || 0, msg: (res && (res.msg || res.message)) || '', file: d.file || null, pass: d.access_pass || ap || '' };
+        },
         async _fileLink(ref) {
-            let meta = await base.get('https://webapi.ctfile.com/getfile.php?path=f&f=' + encodeURIComponent(ref.id) + '&passcode=' + encodeURIComponent(ref.pass) + '&token=false&r=' + Math.random());
-            let info = meta && meta.file;
-            if (!info || !info.file_chk) return base.renderErrorPanel('读取文件信息失败：' + ((info && info.message) || (meta && meta.msg) || '请确认提取码后重试'), this);
-            let link = await this._linkOf({ kind: 'file', id: ref.id, folder_id: '0', fk: '', passcode: ref.pass, type_id: '0' }, info.verifycode, {
+            let ap = this._localPass('access-pass', ref.id);
+            if (!ap) return base.renderErrorPanel('读不到页面凭证，刷新页面后重试', this);
+            let r = await this._resource(ref, ap);
+            let info = r.file;
+            if (!info || !info.file_chk) return base.renderErrorPanel('读取文件信息失败：' + (r.msg || ('城通返回 ' + r.code)), this);
+            let link = await this._linkOf({ kind: 'file', id: ref.id, folder_id: '0', fk: '', passcode: ref.pass, type_id: '0', access_pass: r.pass }, info.verifycode, {
                 file_id: info.file_id, userid: info.userid, file_chk: info.file_chk, start_time: info.start_time, wait_seconds: info.wait_seconds
             });
-            if (!link) return base.renderErrorPanel('取不到下载地址：提取码可能不对，或需要验证码', this);
+            if (!link) return base.renderErrorPanel('取不到下载地址，请重试', this);
             base.renderDownloadPanel([this._fileRow(info, link)], this);
         },
         async _dirLink(ref) {
@@ -4396,8 +4666,9 @@
         },
         async _listing(ref) {
             let rows = [];
+            let ap = this._localPass('access-pass', ref.id);
             for (let page = 0; page < 5; page++) {
-                let res = await base.get('https://urlapi.ctfile.com/api/v2/listing?kind=dir&id=' + encodeURIComponent(ref.id) + '&folder_id=0&fk=&passcode=' + encodeURIComponent(ref.pass) + '&type_id=0&start=' + rows.length + '&length=200');
+                let res = await base.get('https://urlapi.ctfile.com/api/v2/listing?kind=dir&id=' + encodeURIComponent(ref.id) + '&folder_id=0&fk=&passcode=' + encodeURIComponent(ref.pass) + '&type_id=0&start=' + rows.length + '&length=200' + (ap ? '&access_pass=' + encodeURIComponent(ap) : ''));
                 if (res && res.code && res.code !== 200) throw new Error(res.msg || ('城通返回 ' + res.code));
                 let d = res && res.data;
                 let batch = (d && d.rows) || [];
@@ -4406,12 +4677,21 @@
             }
             return rows;
         },
-        // 临时 id 在 href 上，凭据只能用列表返回的那份
+        // 后台直发缺 Origin 会被拒，改在页面内发
         async _linkOf(context, verifycode, original) {
-            let res = await base.post('https://urlapi.ctfile.com/api/v2/download', {
-                context: context, mb: 0, app: 0, verifycode: String(verifycode || ''), original_file: original
-            }, { 'content-type': 'application/json' });
-            let d = (res && res.data) || res || {};
+            let body = { context: context, mb: 0, app: 0, verifycode: String(verifycode || ''), original_file: original };
+            let pw = (typeof unsafeWindow !== 'undefined' && unsafeWindow) ? unsafeWindow : window;
+            if (!pw || typeof pw.fetch !== 'function') throw new Error('读不到页面环境，刷新页面后重试');
+            let r = await pw.fetch('https://urlapi.ctfile.com/api/v2/download', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(body),
+            });
+            let res = null;
+            try { res = await r.json(); } catch (e) { }
+            if (!res) throw new Error('HTTP ' + r.status);
+            let d = res.data || res;
             return d.downurl || d.url || d.download_url || '';
         },
         _fileRow(info, link, raw) {

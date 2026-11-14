@@ -118,9 +118,9 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 | 知乎增强 | [XIU2/UserScript](https://github.com/XIU2/UserScript)<br>GPL-3.0 | 2.3.32 | 移除登录弹窗、屏蔽指定类别 / 低赞低评 / 用户 / 关键词、默认收起回答、快捷收起与回到顶部、默认高清原图、站外直链等 | [GreasyFork 419081](https://greasyfork.org/zh-CN/scripts/419081) | [`Zhihu-Enhanced.user.js`](https://raw.githubusercontent.com/XIU2/UserScript/master/Zhihu-Enhanced.user.js) |
 | 抖音下载 | [zhzLuke96/douyin-dl-user-js](https://github.com/zhzLuke96/douyin-dl-user-js)<br>MIT | 1.5.15 | 无水印视频 / 图集 / 评论区图片 / 表情包 / 封面下载，视频帧截图，弹幕下载（ASS），下载历史与自定义文件名，作者主页批量下载（断点续传、并发、筛选、后台继续），可接 abdm / aria2 / IDM / BitComet 外部下载器 | [Release 直链](https://github.com/zhzLuke96/douyin-dl-user-js/releases/latest/download/dy-dl.user.js) | [GreasyFork 522326](https://greasyfork.org/zh-CN/scripts/522326) |
 | 更好的 X（BetterX） | [Iskongkongyo/BetterX](https://github.com/Iskongkongyo/BetterX)<br>MIT | 4.0.0<br><sub>源码已到 4.1.0，未发版</sub> | X（Twitter）增强：时间线帖子本地记录、全文搜索、收藏 / 置顶 / 备注、闪现帖标记；黄推与广告净化、媒体批量下载（ZIP、GIF）；通知订阅管理、宽屏与主页增强、四语界面 | [GreasyFork 588748](https://greasyfork.org/zh-CN/scripts/588748) | [Release v4.0.0](https://github.com/Iskongkongyo/BetterX/releases/download/v4.0.0/BetterX-v4.0.0.js) |
-| 网盘直链下载助手（FerryLink） | [Wjavan/FerryLink](https://github.com/Wjavan/FerryLink)<br>GPL-3.0 | 1.6.1 | 百度 / 阿里 / 天翼 / 迅雷 / 夸克 / 移动 / 城通网盘直链解析与批量取链，推送到 IDM / Aria2 / Motrix / BitComet / XDown，或复制 cURL、aria2c 命令；多链并发、主题与深色模式 | [GreasyFork 595544](https://greasyfork.org/zh-CN/scripts/595544) | [`网盘直链下载助手.user.js`](https://raw.githubusercontent.com/Wjavan/FerryLink/main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js) |
+| 网盘直链下载助手（FerryLink） | [Wjavan/FerryLink](https://github.com/Wjavan/FerryLink)<br>GPL-3.0 | 1.6.5 | 百度 / 阿里 / 天翼 / 迅雷 / 夸克 / 移动 / 城通网盘直链解析与批量取链（含百度分享页），推送到 IDM / Aria2 / Motrix / BitComet / XDown，或复制 cURL、aria2c 命令；多链并发、主题与深色模式 | [GreasyFork 595544](https://greasyfork.org/zh-CN/scripts/595544) | [`网盘直链下载助手.user.js`](https://raw.githubusercontent.com/Wjavan/FerryLink/main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js) |
 
-<sub>版本号核对于 2026-11-04。XIU2 三份 GitHub raw 直链实测返回 200；抖音下载取最新 Release tag `v1.5.15`（2026-09-09 发布，仓库此后仍有提交但未发新版）；BetterX 取最新 Release `v4.0.0`（2026-10-24），但仓库 README 徽章与构建产物名已标到 4.1.0，尚无对应 tag；FerryLink 版本取自脚本 header（与最新 Release tag `v1.6.1` 一致），raw 直链实测 200 且与仓库内容 md5 相同。</sub>
+<sub>版本号核对于 2026-11-14。XIU2 三份 GitHub raw 直链实测返回 200；抖音下载取最新 Release tag `v1.5.15`（2026-09-09 发布，仓库此后仍有提交但未发新版）；BetterX 取最新 Release `v4.0.0`（2026-10-24），但仓库 README 徽章与构建产物名已标到 4.1.0，尚无对应 tag；FerryLink 版本取自脚本 header（与最新 Release tag `v1.6.5` 一致，2026-11-13 发布），raw 直链实测 200 且与仓库内容一致。</sub>
 
 <sub>**本地镜像**：以上 6 个脚本各存了一份原样副本在 [`third-party/userscripts/`](third-party/userscripts/)，每个副本都记了来源仓库、ref、**对应的上游 commit**、sha256 与同步时间（见 [`third-party/SOURCES.md`](third-party/SOURCES.md)），后期核对「镜像落后多少」有据可查。同步工具：`node third-party/sync.mjs`。镜像只用于阅读与复核 —— **不要从镜像安装，也不要把它当 `@updateURL`**，安装用上表地址。</sub>
 
@@ -154,7 +154,8 @@ https://raw.githubusercontent.com/lytree/GMScript/main/userscripts/telegram-medi
 **网盘直链下载助手（FerryLink）**
 
 - **文件名是中文，正好是本仓库约定的反面教材**：仓库根目录唯一脚本叫 `网盘直链下载助手.user.js`，raw 地址必须百分号编码才能访问（直接用中文字符的 URL 在本机实测返回 000）。这也解释了本仓库为什么强制 ASCII kebab-case。
-- **更新走 GreasyFork**：header 里 `@updateURL` / `@downloadURL` 都指向 `update.greasyfork.org/scripts/595544/...`，即使从仓库 raw 装的，升级也由 GreasyFork 分发。**Release 里没有 js 资产**（v1.6.1 只有 changelog），别去 Release 找文件。
+- **更新走 GreasyFork**：header 里 `@updateURL` / `@downloadURL` 都指向 `update.greasyfork.org/scripts/595544/...`，即使从仓库 raw 装的，升级也由 GreasyFork 分发。**Release 里没有 js 资产**（v1.6.1 – v1.6.5 每版都只挂 changelog），别去 Release 找文件。
+- **1.6.2 → 1.6.5 的变化面**：新增 `https://pan.baidu.com/s/*` 匹配（百度**分享页**也能解析直链）、夸克直链补齐文件名、深色模式弹窗补底、切页后「下载助手」按钮不再消失；RPC 推送不再下发非法保存路径，文件名按 Windows 保留字符与 ext4/APFS 255 字节上限清洗（路径过长 / 含 `:*?"<>|` 而推送失败的问题由此解决）。`@require` 仍是那三个依赖，`@connect *` 也仍在，权限面没变。
 - **三个 `@require` 外部依赖**：jQuery 3.7.0 / sweetalert2 10.16.6 / js-md5 0.7.3，全部来自 `registry.npmmirror.com`。该源不通或被拦时脚本直接起不来（页面无反应，控制台会有 require 失败）。
 - **权限面偏大**：为适配任意下载器与直链域名，声明了 `@connect *`、`GM_cookie`、`GM_xmlhttpRequest`。功能上说得通，但意味着脚本能向任意域发请求、能读 Cookie，装前自己掂量。
 - **是二次开发，不是原创**：header 描述写明「基于油小猴(youxiaohou.com)的网盘直链下载助手修改」，GPL-3.0。

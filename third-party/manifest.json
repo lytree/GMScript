@@ -1,6 +1,6 @@
 {
   "note": "README「关联脚本」中列出的第三方脚本的本地只读镜像。文件内容不做任何修改；安装请用 README 里的上游地址，不要据此清单重新分发。",
-  "syncedAt": "2026-11-04",
+  "syncedAt": "2026-11-14",
   "scripts": [
     {
       "id": "github-enhanced",
@@ -78,20 +78,20 @@
       "license": "GPL-3.0",
       "file": "ferrylink.user.js",
       "upstreamFile": "网盘直链下载助手.user.js",
-      "version": "1.6.1",
+      "version": "1.6.5",
       "url": "https://raw.githubusercontent.com/Wjavan/FerryLink/main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js",
       "alternates": [
         "https://cdn.jsdelivr.net/gh/Wjavan/FerryLink@main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js"
       ],
-      "size": 255252,
-      "sha256": "25798af464b8e39775efbef5ee1e96e45f4ecbc087462fab8b580e4bb1a81a6f",
+      "size": 274384,
+      "sha256": "b79a1733bb581f9acc898a7879926ef2b19b5421ae68183a67e7f031129de689",
       "source": {
         "refType": "branch",
         "ref": "main",
-        "commit": "75f64cadf56c63fd4e59296bdc8c8b042b03a234",
-        "committedAt": "2026-11-03T14:13:12Z",
+        "commit": "6118324d70b8130e1ba140871df6cf7cfc051940",
+        "committedAt": "2026-11-13T14:59:28Z",
         "resolvedUrl": "https://raw.githubusercontent.com/Wjavan/FerryLink/main/%E7%BD%91%E7%9B%98%E7%9B%B4%E9%93%BE%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B.user.js",
-        "fetchedAt": "2026-11-04T12:10:47.061Z"
+        "fetchedAt": "2026-11-14T03:01:34.586Z"
       }
     },
     {
@@ -113,7 +113,7 @@
         "ref": "v1.5.15",
         "commit": "721d14f9c66a44ceb40dbf702f3d38a1ff2c0366",
         "committedAt": "2026-09-09T20:04:57Z",
-        "resolvedUrl": "https://gh-proxy.com/https://github.com/zhzLuke96/douyin-dl-user-js/releases/download/v1.5.15/dy-dl.user.js",
+        "resolvedUrl": "https://github.com/zhzLuke96/douyin-dl-user-js/releases/download/v1.5.15/dy-dl.user.js",
         "fetchedAt": "2026-11-04T12:11:00.582Z"
       }
     },
@@ -136,7 +136,7 @@
         "ref": "v4.0.0",
         "commit": "1770501a575752f5c412db475184545246c9935b",
         "committedAt": "2026-10-24T07:56:49Z",
-        "resolvedUrl": "https://gh-proxy.com/https://github.com/Iskongkongyo/BetterX/releases/download/v4.0.0/BetterX-v4.0.0.js",
+        "resolvedUrl": "https://github.com/Iskongkongyo/BetterX/releases/download/v4.0.0/BetterX-v4.0.0.js",
         "fetchedAt": "2026-11-04T12:11:29.552Z"
       }
     }
